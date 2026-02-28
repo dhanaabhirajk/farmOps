@@ -7,13 +7,13 @@ WORKDIR /app
 FROM base as development
 
 # Copy package files
-COPY frontend/package*.json ./
+COPY package*.json ./
 
 # Install dependencies
 RUN npm ci
 
 # Copy source code
-COPY frontend/ ./
+COPY ./ ./
 
 EXPOSE 3000
 
@@ -23,13 +23,13 @@ CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0"]
 FROM base as build
 
 # Copy package files
-COPY frontend/package*.json ./
+COPY package*.json ./
 
 # Install dependencies
 RUN npm ci
 
 # Copy source code
-COPY frontend/ ./
+COPY ./ ./
 
 # Build the app
 RUN npm run build
@@ -38,7 +38,7 @@ RUN npm run build
 FROM base as production
 
 # Copy package files
-COPY frontend/package*.json ./
+COPY package*.json ./
 
 # Install only production dependencies
 RUN npm ci --only=production

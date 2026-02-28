@@ -57,41 +57,41 @@ Every task follows: `- [ ] [TaskID] [P?] [Story?] Description with file path`
 
 ### Database Foundation
 
-- [ ] T021 Initialize Supabase migrations in supabase/migrations/
-- [ ] T022 [P] Create migration for users table with RLS policies in supabase/migrations/001_users.sql
-- [ ] T023 [P] Create migration for farms table with PostGIS support in supabase/migrations/002_farms.sql
-- [ ] T024 [P] Create migration for data_audit_logs table in supabase/migrations/003_data_audit_logs.sql
-- [ ] T025 Create migration for user_actions table (offline queue) in supabase/migrations/004_user_actions.sql
-- [ ] T026 Create seed data with 3 test farms (Thanjavur, Coimbatore, Madurai) in supabase/seed.sql
+- [X] T021 Initialize Supabase migrations in supabase/migrations/
+- [X] T022 [P] Create migration for users table with RLS policies in supabase/migrations/001_users.sql
+- [X] T023 [P] Create migration for farms table with PostGIS support in supabase/migrations/002_farms.sql
+- [X] T024 [P] Create migration for data_audit_logs table in supabase/migrations/003_data_audit_logs.sql
+- [X] T025 Create migration for user_actions table (offline queue) in supabase/migrations/004_user_actions.sql
+- [X] T026 Create seed data with 3 test farms (Thanjavur, Coimbatore, Madurai) in supabase/seed.sql
 
 ### Backend Foundation
 
-- [ ] T027 Create base SQLAlchemy models in backend/src/models/base.py
-- [ ] T028 [P] Create User model in backend/src/models/user.py
-- [ ] T029 [P] Create Farm model with PostGIS geometry support in backend/src/models/farm.py
-- [ ] T030 [P] Create DataAuditLog model in backend/src/models/data_audit_log.py
-- [ ] T031 Create Supabase client initialization in backend/src/db/supabase_client.py
-- [ ] T032 Create audit logging service in backend/src/services/audit/audit_logger.py
-- [ ] T033 [P] Create geospatial utilities (S2/H3 tiling, polygon validation) in backend/src/utils/geospatial.py
-- [ ] T034 [P] Create rate limiting middleware in backend/src/middleware/rate_limiter.py
-- [ ] T035 [P] Create error handling middleware in backend/src/middleware/error_handler.py
-- [ ] T036 Create API router initialization in backend/src/api/__init__.py
-- [ ] T037 Create FastAPI app initialization with middleware in backend/src/main.py
+- [X] T027 Create base SQLAlchemy models in backend/src/models/base.py
+- [X] T028 [P] Create User model in backend/src/models/user.py
+- [X] T029 [P] Create Farm model with PostGIS geometry support in backend/src/models/farm.py
+- [X] T030 [P] Create DataAuditLog model in backend/src/models/data_audit_log.py
+- [X] T031 Create Supabase client initialization in backend/src/db/supabase_client.py
+- [X] T032 Create audit logging service in backend/src/services/audit/audit_logger.py
+- [X] T033 [P] Create geospatial utilities (S2/H3 tiling, polygon validation) in backend/src/utils/geospatial.py
+- [X] T034 [P] Create rate limiting middleware in backend/src/middleware/rate_limiter.py
+- [X] T035 [P] Create error handling middleware in backend/src/middleware/error_handler.py
+- [X] T036 Create API router initialization in backend/src/api/__init__.py
+- [X] T037 Create FastAPI app initialization with middleware in backend/src/main.py
 
 ### AI Foundation
 
-- [ ] T038 Create Mistral client initialization (OpenAI-compatible) in backend/src/services/ai/mistral_client.py
-- [ ] T039 Create base LLM tool definition framework in backend/src/services/ai/tool_registry.py
-- [ ] T040 Create tool execution wrapper with audit logging in backend/src/services/ai/tool_executor.py
+- [X] T038 Create Mistral client initialization (OpenAI-compatible) in backend/src/services/ai/mistral_client.py
+- [X] T039 Create base LLM tool definition framework in backend/src/services/ai/tool_registry.py
+- [X] T040 Create tool execution wrapper with audit logging in backend/src/services/ai/tool_executor.py
 
 ### Frontend Foundation
 
-- [ ] T041 Create Remix root layout with responsive design in frontend/app/root.tsx
-- [ ] T042 [P] Configure Tailwind CSS with custom theme in frontend/tailwind.config.ts
-- [ ] T043 [P] Create Supabase auth context in frontend/app/contexts/auth.tsx
-- [ ] T044 [P] Create API client utilities in frontend/app/utils/api-client.ts
-- [ ] T045 [P] Create common UI components (Button, Card, Loading) in frontend/app/components/ui/
-- [ ] T046 Create error boundary component in frontend/app/components/ErrorBoundary.tsx
+- [X] T041 Create Remix root layout with responsive design in frontend/app/root.tsx
+- [X] T042 [P] Configure Tailwind CSS with custom theme in frontend/tailwind.config.ts
+- [X] T043 [P] Create Supabase auth context in frontend/app/contexts/auth.tsx
+- [X] T044 [P] Create API client utilities in frontend/app/utils/api-client.ts
+- [X] T045 [P] Create common UI components (Button, Card, Loading) in frontend/app/components/ui/
+- [X] T046 Create error boundary component in frontend/app/components/ErrorBoundary.tsx
 
 **Checkpoint**: Foundation ready - user story implementation can now begin in parallel
 

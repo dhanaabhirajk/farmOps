@@ -20,8 +20,8 @@ RUN pip install --no-cache-dir uv
 FROM base as development
 
 # Copy project files
-COPY backend/pyproject.toml backend/README.md ./
-COPY backend/src ./src
+COPY pyproject.toml README.md ./
+COPY src ./src
 
 # Install dependencies
 RUN uv pip install --system -e ".[dev]"
@@ -34,8 +34,8 @@ CMD ["uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload
 FROM base as production
 
 # Copy project files
-COPY backend/pyproject.toml backend/README.md ./
-COPY backend/src ./src
+COPY pyproject.toml README.md ./
+COPY src ./src
 
 # Install only production dependencies
 RUN uv pip install --system .
