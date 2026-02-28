@@ -5,6 +5,7 @@ from uuid import UUID
 
 from geoalchemy2 import Geography
 from sqlalchemy import Column, DateTime, Text
+from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import relationship
 
 from .base import Base, TimestampMixin
@@ -15,7 +16,7 @@ class User(Base, TimestampMixin):
 
     __tablename__ = "users"
 
-    id = Column(UUID, primary_key=True)  # References auth.users(id)
+    id = Column(PGUUID(as_uuid=True), primary_key=True)  # References auth.users(id)
     email = Column(Text, nullable=False, unique=True, index=True)
     phone = Column(Text, unique=True, index=True)
     name = Column(Text)

@@ -61,7 +61,6 @@ services:
     volumes:
       - supabase-data:/var/lib/postgresql/data
       - ./supabase/migrations:/docker-entrypoint-initdb.d
-    command: postgres -c shared_preload_libraries=postgis
     networks:
       - farmops-network
 
