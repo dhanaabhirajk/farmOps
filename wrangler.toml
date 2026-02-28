@@ -1,0 +1,41 @@
+name = "farmops"
+compatibility_date = "2024-01-01"
+
+# Frontend deployment to Cloudflare Pages
+[env.production]
+name = "farmops-frontend-production"
+routes = [
+  { pattern = "farmops.com", zone_name = "farmops.com" },
+  { pattern = "www.farmops.com", zone_name = "farmops.com" }
+]
+
+# Environment variables for frontend
+[env.production.vars]
+API_URL = "https://api.farmops.com"
+SUPABASE_URL = "https://your-project.supabase.co"
+
+# Staging environment
+[env.staging]
+name = "farmops-frontend-staging"
+routes = [
+  { pattern = "staging.farmops.com", zone_name = "farmops.com" }
+]
+
+[env.staging.vars]
+API_URL = "https://api-staging.farmops.com"
+SUPABASE_URL = "https://your-project-staging.supabase.co"
+
+# Build configuration
+[build]
+command = "npm run build"
+cwd = "frontend"
+watch_dir = "frontend"
+
+[build.upload]
+format = "service-worker"
+dir = "frontend/build/client"
+main = "./frontend/build/server/index.js"
+
+# Pages configuration
+[[pages_build_output_dir]]
+directory = "frontend/build/client"

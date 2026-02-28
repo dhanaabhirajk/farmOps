@@ -1,0 +1,144 @@
+name: Test User Stories with Auto-Fix
+
+on:
+  push:
+    branches: [main, staging, '010-*']
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  test-user-stories:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+      
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Install dependencies
+        run: |
+          cd frontend && npm ci
+          cd ../backend && pip install uv && uv pip install --system -e ".[dev]"
+      
+      - name: Create .env file
+        run: |
+          cp .env.dev .env
+          echo "SUPABASE_URL=${{ secrets.SUPABASE_URL }}" >> .env
+          echo "SUPABASE_KEY=${{ secrets.SUPABASE_KEY }}" >> .env
+      
+      - name: Start Docker Compose
+        run: |
+          docker-compose -f docker-compose.dev.yml up -d
+          sleep 15
+      
+      - name: Wait for services
+        run: |
+          timeout 60 bash -c 'until curl -f http://localhost:8000/health 2>/dev/null; do sleep 2; done'
+          timeout 60 bash -c 'until curl -f http://localhost:3000 2>/dev/null; do sleep 2; done'
+      
+      - name: Run User Story Tests
+        id: tests
+        continue-on-error: true
+        run: |
+          cd frontend
+          npx playwright test --reporter=json > ../test-results.json || true
+      
+      - name: Capture Docker Logs (if tests failed)
+        if: steps.tests.outcome == 'failure'
+        run: |
+          bash scripts/docker-log-capture.sh
+      
+      - name: Analyze & Auto-Fix
+        if: steps.tests.outcome == 'failure'
+        run: |
+          LOG_PATH=$(cat ./test-results/last-log-path.txt)
+          if [ -f "frontend/tests/utils/auto-fix-cli.ts" ]; then
+            cd frontend && npx ts-node tests/utils/auto-fix-cli.ts --logs "$LOG_PATH" --test-results ../test-results.json
+          else
+            echo "Auto-fix utility not yet implemented"
+          fi
+      
+      - name: Re-run Tests After Fix
+        if: steps.tests.outcome == 'failure'
+        run: |
+          docker-compose -f docker-compose.dev.yml restart
+          sleep 10
+          cd frontend && npx playwright test
+      
+      - name: Upload Test Results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: |
+            test-results/
+            test-results.json
+          retention-days: 30
+      
+      - name: Upload Playwright Report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: frontend/playwright-report/
+          retention-days: 30
+      
+      - name: Comment PR with Results
+        if: github.event_name == 'pull_request' && always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            let results = { passed: 0, failed: 0 };
+            let autoFix = [];
+            
+            try {
+              if (fs.existsSync('test-results.json')) {
+                const data = JSON.parse(fs.readFileSync('test-results.json'));
+                results.passed = data.stats?.expected || 0;
+                results.failed = data.stats?.unexpected || 0;
+              }
+              if (fs.existsSync('test-results/auto-fix-log.json')) {
+                autoFix = JSON.parse(fs.readFileSync('test-results/auto-fix-log.json'));
+              }
+            } catch (e) {
+              console.log('Error reading results:', e);
+            }
+            
+            const comment = `
+            ## 🧪 Test Results
+            
+            - ✅ Passed: ${results.passed}
+            - ❌ Failed: ${results.failed}
+            - 🔧 Auto-fixed: ${autoFix.length}
+            
+            ${autoFix.length > 0 ? '### Auto-Fix Summary\n' + autoFix.map(f => 
+              `- **${f.test}**: ${f.fixResult.success ? '✅' : '❌'} ${f.analysis.rootCause}`
+            ).join('\n') : ''}
+            
+            [View full test results](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})
+            `;
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: comment
+            });
+      
+      - name: Cleanup
+        if: always()
+        run: docker-compose -f docker-compose.dev.yml down -v
