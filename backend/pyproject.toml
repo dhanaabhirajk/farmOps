@@ -1,0 +1,66 @@
+[project]
+name = "farmops-backend"
+version = "0.1.0"
+description = "Location-Based Insights Engine for Tamil Nadu Farmers - Backend API"
+readme = "README.md"
+authors = [
+    { name = "dhanaabhirajk", email = "81916146+dhanaabhirajk@users.noreply.github.com" }
+]
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.32.0",
+    "supabase>=2.10.0",
+    "pydantic>=2.10.0",
+    "pydantic-settings>=2.6.0",
+    "shapely>=2.0.6",
+    "rasterio>=1.4.3",
+    "earthengine-api>=1.1.0",
+    "httpx>=0.27.0",
+    "python-dotenv>=1.0.1",
+    "openai>=1.57.0",
+    "sqlalchemy>=2.0.36",
+    "psycopg2-binary>=2.9.10",
+    "geoalchemy2>=0.15.2",
+    "s2sphere>=0.2.5",
+    "h3>=3.7.7",
+]
+
+[project.optional-dependencies]
+dev = [
+    "ruff>=0.8.0",
+    "mypy>=1.13.0",
+    "pytest>=8.3.0",
+    "pytest-asyncio>=0.25.0",
+    "pytest-cov>=6.0.0",
+    "httpx>=0.27.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+select = ["E", "F", "I", "N", "W", "UP", "B", "A", "C4", "DTZ", "T10", "ISC", "ICN", "PIE", "PYI", "PT", "Q", "RSE", "RET", "SIM", "TID", "ARG", "PLE", "PLW", "PLR", "RUF"]
+ignore = ["E501", "PLR0913", "PLR2004"]
+
+[tool.ruff.per-file-ignores]
+"__init__.py" = ["F401"]
+"tests/*" = ["ARG001", "PLR2004"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "tests.*"
+disallow_untyped_defs = false

@@ -26,26 +26,26 @@ Every task follows: `- [ ] [TaskID] [P?] [Story?] Description with file path`
 
 **Purpose**: Project initialization, Docker environment, and dependency management
 
-- [ ] T001 Initialize backend Python project with uv package manager in backend/
-- [ ] T002 [P] Initialize frontend Remix project with TypeScript in frontend/
-- [ ] T003 [P] Create docker-compose.dev.yml with services: backend, frontend, supabase
+- [X] T001 Initialize backend Python project with uv package manager in backend/
+- [X] T002 [P] Initialize frontend Remix project with TypeScript in frontend/
+- [X] T003 [P] Create docker-compose.dev.yml with services: backend, frontend, supabase
 - [ ] T004 [P] Create docker-compose.prod.yml with optimized multi-stage builds
-- [ ] T005 [P] Create Dockerfile.backend with Python 3.11+ and FastAPI dependencies
-- [ ] T006 [P] Create Dockerfile.frontend with Node.js and Remix build
-- [ ] T007 [P] Create .env.dev with mock environment variables (no API keys required)
-- [ ] T008 [P] Create .env.example documenting all required environment variables
-- [ ] T009 [P] Configure backend linting (ruff, mypy) in backend/pyproject.toml
+- [X] T005 [P] Create Dockerfile.backend with Python 3.11+ and FastAPI dependencies
+- [X] T006 [P] Create Dockerfile.frontend with Node.js and Remix build
+- [X] T007 [P] Create .env.dev with mock environment variables (no API keys required)
+- [X] T008 [P] Create .env.example documenting all required environment variables
+- [X] T009 [P] Configure backend linting (ruff, mypy) in backend/pyproject.toml
 - [ ] T010 [P] Configure frontend linting (ESLint, Prettier) in frontend/.eslintrc.js
-- [ ] T011 Install Python dependencies: fastapi, uvicorn, supabase-py, shapely, rasterio, earthengine-api in backend/
-- [ ] T012 [P] Install frontend dependencies: remix, react, tailwindcss in frontend/
-- [ ] T013 [P] Setup Cloudflare configuration in wrangler.toml for Pages deployment
-- [ ] T014 [P] Create scripts/docker-log-capture.sh for test error logging
-- [ ] T015 [P] Create scripts/test-workflow.sh for automated Playwright test orchestration
-- [ ] T016 [P] Create .github/workflows/test-user-stories.yml for CI testing pipeline
-- [ ] T017 [P] Create .github/workflows/deploy.yml for Cloudflare deployment
-- [ ] T018 Create README.md with project overview and quickstart reference
-- [ ] T019 [P] Setup backend hot reload configuration (uvicorn --reload) in docker-compose.dev.yml
-- [ ] T020 [P] Setup frontend hot reload configuration (Remix dev mode) in docker-compose.dev.yml
+- [X] T011 Install Python dependencies: fastapi, uvicorn, supabase-py, shapely, rasterio, earthengine-api in backend/
+- [X] T012 [P] Install frontend dependencies: remix, react, tailwindcss in frontend/
+- [X] T013 [P] Setup Cloudflare configuration in wrangler.toml for Pages deployment
+- [X] T014 [P] Create scripts/docker-log-capture.sh for test error logging
+- [X] T015 [P] Create scripts/test-workflow.sh for automated Playwright test orchestration
+- [X] T016 [P] Create .github/workflows/test-user-stories.yml for CI testing pipeline
+- [X] T017 [P] Create .github/workflows/deploy.yml for Cloudflare deployment
+- [X] T018 Create README.md with project overview and quickstart reference
+- [X] T019 [P] Setup backend hot reload configuration (uvicorn --reload) in docker-compose.dev.yml
+- [X] T020 [P] Setup frontend hot reload configuration (Remix dev mode) in docker-compose.dev.yml
 
 ---
 

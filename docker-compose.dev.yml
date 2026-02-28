@@ -1,0 +1,75 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: ../Dockerfile.backend
+      target: development
+    container_name: farmops-backend-dev
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app
+      - backend-cache:/app/.venv
+    environment:
+      - ENVIRONMENT=development
+      - PYTHONUNBUFFERED=1
+      - SUPABASE_URL=${SUPABASE_URL:-http://supabase:54321}
+      - SUPABASE_KEY=${SUPABASE_KEY:-your-anon-key}
+      - MISTRAL_API_KEY=${MISTRAL_API_KEY:-mock-key-for-dev}
+      - GEE_SERVICE_ACCOUNT=${GEE_SERVICE_ACCOUNT:-mock-gee-account}
+      - IMD_API_KEY=${IMD_API_KEY:-mock-imd-key}
+      - OPENWEATHER_API_KEY=${OPENWEATHER_API_KEY:-mock-openweather-key}
+    command: uvicorn src.main:app --host 0.0.0.0 --port 8000 --reload
+    depends_on:
+      - supabase
+    networks:
+      - farmops-network
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: ../Dockerfile.frontend
+      target: development
+    container_name: farmops-frontend-dev
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./frontend:/app
+      - frontend-node-modules:/app/node_modules
+    environment:
+      - NODE_ENV=development
+      - VITE_SUPABASE_URL=${SUPABASE_URL:-http://supabase:54321}
+      - VITE_SUPABASE_ANON_KEY=${SUPABASE_KEY:-your-anon-key}
+      - VITE_API_URL=http://backend:8000
+    command: npm run dev
+    depends_on:
+      - backend
+    networks:
+      - farmops-network
+
+  supabase:
+    image: supabase/postgres:15.1.0.147
+    container_name: farmops-supabase-dev
+    ports:
+      - "54321:5432"
+    environment:
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=postgres
+      - POSTGRES_USER=postgres
+    volumes:
+      - supabase-data:/var/lib/postgresql/data
+      - ./supabase/migrations:/docker-entrypoint-initdb.d
+    command: postgres -c shared_preload_libraries=postgis
+    networks:
+      - farmops-network
+
+volumes:
+  backend-cache:
+  frontend-node-modules:
+  supabase-data:
+
+networks:
+  farmops-network:
+    driver: bridge
