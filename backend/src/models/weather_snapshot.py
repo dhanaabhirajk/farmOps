@@ -3,7 +3,7 @@
 from datetime import date
 from uuid import UUID
 
-from sqlalchemy import Column, Date, ForeignKey
+from sqlalchemy import Column, Date, ForeignKey, Index
 from sqlalchemy.dialects.postgresql import JSONB, UUID as PGUUID
 from sqlalchemy.orm import relationship
 
@@ -30,11 +30,7 @@ class WeatherSnapshot(Base, UUIDMixin, TimestampMixin):
     farm = relationship("Farm", foreign_keys=[farm_id])
 
     __table_args__ = (
-        # Composite index for time-series queries
-        ("idx_weather_snapshots_farm_id_date", {
-            "postgresql_using": "btree",
-            "postgresql_where": None
-        }),
+        Index('idx_weather_snapshots_farm_id_date', 'farm_id', 'snapshot_date'),
     )
 
     def __repr__(self) -> str:

@@ -190,7 +190,7 @@ Every task follows: `- [ ] [TaskID] [P?] [Story?] Description with file path`
 ### Backend Models for User Story 2
 
 - [X] T097 [US2] Create Recommendation model in backend/src/models/recommendation.py
-- [ ] T098 [US2] Create RecommendationPayload schema in backend/src/models/schemas/recommendation_payload.py
+- [X] T098 [US2] Create RecommendationPayload schema in backend/src/models/schemas/recommendation_payload.py
 
 ### Backend LLM Tools for User Story 2
 
@@ -198,7 +198,7 @@ Every task follows: `- [ ] [TaskID] [P?] [Story?] Description with file path`
 - [X] T100 [P] [US2] Implement estimate_production_cost tool in backend/src/services/ai_tools/estimate_production_cost.py
 - [X] T101 [P] [US2] Implement estimate_risk_score tool in backend/src/services/ai_tools/estimate_risk_score.py
 - [X] T102 [P] [US2] Implement estimate_profit tool in backend/src/services/ai_tools/estimate_profit.py
-- [ ] T103 Register User Story 2 tools in tool registry in backend/src/services/ai/tool_registry.py
+- [X] T103 Register User Story 2 tools in tool registry in backend/src/services/ai/tool_registry.py
 
 ### Backend Services for User Story 2
 
@@ -208,19 +208,19 @@ Every task follows: `- [ ] [TaskID] [P?] [Story?] Description with file path`
 
 ### Backend API for User Story 2
 
-- [ ] T107 [US2] Implement POST /api/farm/recommendations endpoint in backend/src/api/routes/recommendations.py
-- [ ] T108 [US2] Implement GET /api/farm/recommendations endpoint (retrieve historical) in backend/src/api/routes/recommendations.py
-- [ ] T109 [US2] Add validation for recommendation requests in backend/src/api/routes/recommendations.py
+- [X] T107 [US2] Implement POST /api/farm/recommendations endpoint in backend/src/api/routes/recommendations.py
+- [X] T108 [US2] Implement GET /api/farm/recommendations endpoint (retrieve historical) in backend/src/api/routes/recommendations.py
+- [X] T109 [US2] Add validation for recommendation requests in backend/src/api/routes/recommendations.py
 
 ### Frontend UI for User Story 2
 
-- [ ] T110 [P] [US2] Create CropRecommendationCard component in frontend/app/components/recommendations/CropRecommendationCard.tsx
-- [ ] T111 [P] [US2] Create RiskScoreIndicator component in frontend/app/components/recommendations/RiskScoreIndicator.tsx
-- [ ] T112 [P] [US2] Create PlantingWindowCalendar component in frontend/app/components/recommendations/PlantingWindowCalendar.tsx
-- [ ] T113 [P] [US2] Create ProfitBreakdown component in frontend/app/components/recommendations/ProfitBreakdown.tsx
-- [ ] T114 [P] [US2] Create ConfidenceBar component in frontend/app/components/recommendations/ConfidenceBar.tsx
-- [ ] T115 [US2] Create crop recommendation page route in frontend/app/routes/farm.$farmId.recommendations.tsx
-- [ ] T116 [US2] Add recommendation request form (season selection) in frontend/app/routes/farm.$farmId.recommendations.tsx
+- [X] T110 [P] [US2] Create CropRecommendationCard component in frontend/app/components/recommendations/CropRecommendationCard.tsx
+- [X] T111 [P] [US2] Create RiskScoreIndicator component in frontend/app/components/recommendations/RiskScoreIndicator.tsx
+- [X] T112 [P] [US2] Create PlantingWindowCalendar component in frontend/app/components/recommendations/PlantingWindowCalendar.tsx
+- [X] T113 [P] [US2] Create ProfitBreakdown component in frontend/app/components/recommendations/ProfitBreakdown.tsx
+- [X] T114 [P] [US2] Create ConfidenceBar component in frontend/app/components/recommendations/ConfidenceBar.tsx
+- [X] T115 [US2] Create crop recommendation page route in frontend/app/routes/farm.$farmId.recommendations.tsx
+- [X] T116 [US2] Add recommendation request form (season selection) in frontend/app/routes/farm.$farmId.recommendations.tsx
 
 ### Tests for User Story 2
 
