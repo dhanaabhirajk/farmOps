@@ -8,7 +8,6 @@ export { CropRecommendationCard } from "./CropRecommendationCard";
 export type { CropRecommendation } from "./CropRecommendationCard";
 
 export { RiskScoreIndicator } from "./RiskScoreIndicator";
-export type { RiskScoreIndicatorProps } from "./RiskScoreIndicator";
 
 export { PlantingWindowCalendar } from "./PlantingWindowCalendar";
 export type { PlantingWindowCalendarProps } from "./PlantingWindowCalendar";
