@@ -89,7 +89,7 @@ class SnapshotGenerator:
         Returns:
             Complete farm snapshot with LLM-generated insights
         """
-        from .ai.llm_agent import get_llm_agent
+        from ..ai.llm_agent import get_llm_agent
 
         logger.info(f"Generating LLM-enriched snapshot for farm {farm_id}")
         started_at = datetime.now(timezone.utc)

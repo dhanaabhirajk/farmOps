@@ -6,22 +6,12 @@ from fastapi import APIRouter
 api_router = APIRouter(prefix="/api/v1")
 
 # Import route modules
+from .routes.farm import router as farm_router
 from .routes.recommendations import router as recommendations_router
 
-# Placeholder for future route imports
-# from .routes.snapshot import router as snapshot_router
-# from .routes.irrigation import router as irrigation_router
-# from .routes.harvest import router as harvest_router
-# from .routes.subsidies import router as subsidies_router
-
 # Register route modules
+api_router.include_router(farm_router, prefix="/farm", tags=["farm"])
 api_router.include_router(recommendations_router, prefix="/farm", tags=["recommendations"])
-
-# Register future routes here
-# api_router.include_router(snapshot_router, prefix="/farm", tags=["snapshot"])
-# api_router.include_router(irrigation_router, prefix="/farm", tags=["irrigation"])
-# api_router.include_router(harvest_router, prefix="/farm", tags=["harvest"])
-# api_router.include_router(subsidies_router, prefix="/farm", tags=["subsidies"])
 
 
 @api_router.get("/health")
