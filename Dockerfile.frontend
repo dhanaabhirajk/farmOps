@@ -1,10 +1,10 @@
 # Multi-stage Dockerfile for Remix frontend
-FROM node:20-alpine as base
+FROM node:20-alpine AS base
 
 WORKDIR /app
 
 # Development stage
-FROM base as development
+FROM base AS development
 
 # Copy package files
 COPY package*.json ./
@@ -20,7 +20,7 @@ EXPOSE 3000
 CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0"]
 
 # Build stage
-FROM base as build
+FROM base AS build
 
 # Copy package files
 COPY package*.json ./

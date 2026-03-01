@@ -105,72 +105,72 @@ Every task follows: `- [ ] [TaskID] [P?] [Story?] Description with file path`
 
 ### Database for User Story 1
 
-- [ ] T047 [P] [US1] Create migration for location_profiles table in supabase/migrations/005_location_profiles.sql
-- [ ] T048 [P] [US1] Create migration for soil_profiles table in supabase/migrations/006_soil_profiles.sql
-- [ ] T049 [P] [US1] Create migration for weather_snapshots table in supabase/migrations/007_weather_snapshots.sql
-- [ ] T050 [P] [US1] Create migration for veg_timeseries table (NDVI) in supabase/migrations/008_veg_timeseries.sql
-- [ ] T051 [P] [US1] Create migration for market_snapshots table in supabase/migrations/009_market_snapshots.sql
-- [ ] T052 [P] [US1] Create migration for farm_snapshots table (cache) in supabase/migrations/010_farm_snapshots.sql
+- [X] T047 [P] [US1] Create migration for location_profiles table in supabase/migrations/005_location_profiles.sql
+- [X] T048 [P] [US1] Create migration for soil_profiles table in supabase/migrations/006_soil_profiles.sql
+- [X] T049 [P] [US1] Create migration for weather_snapshots table in supabase/migrations/007_weather_snapshots.sql
+- [X] T050 [P] [US1] Create migration for veg_timeseries table (NDVI) in supabase/migrations/008_veg_timeseries.sql
+- [X] T051 [P] [US1] Create migration for market_snapshots table in supabase/migrations/009_market_snapshots.sql
+- [X] T052 [P] [US1] Create migration for farm_snapshots table (cache) in supabase/migrations/010_farm_snapshots.sql
 
 ### Backend Models for User Story 1
 
-- [ ] T053 [P] [US1] Create LocationProfile model in backend/src/models/location_profile.py
-- [ ] T054 [P] [US1] Create SoilProfile model in backend/src/models/soil_profile.py
-- [ ] T055 [P] [US1] Create WeatherSnapshot model in backend/src/models/weather_snapshot.py
-- [ ] T056 [P] [US1] Create VegTimeSeries model in backend/src/models/veg_timeseries.py
-- [ ] T057 [P] [US1] Create MarketSnapshot model in backend/src/models/market_snapshot.py
-- [ ] T058 [P] [US1] Create FarmSnapshot model in backend/src/models/farm_snapshot.py
+- [X] T053 [P] [US1] Create LocationProfile model in backend/src/models/location_profile.py
+- [X] T054 [P] [US1] Create SoilProfile model in backend/src/models/soil_profile.py
+- [X] T055 [P] [US1] Create WeatherSnapshot model in backend/src/models/weather_snapshot.py
+- [X] T056 [P] [US1] Create VegTimeSeries model in backend/src/models/veg_timeseries.py
+- [X] T057 [P] [US1] Create MarketSnapshot model in backend/src/models/market_snapshot.py
+- [X] T058 [P] [US1] Create FarmSnapshot model in backend/src/models/farm_snapshot.py
 
 ### Backend Services - Data Fetching for User Story 1
 
-- [ ] T059 [P] [US1] Implement Google Earth Engine integration in backend/src/services/satellite/gee_client.py
-- [ ] T060 [P] [US1] Implement NDVI time-series fetcher in backend/src/services/satellite/ndvi_fetcher.py
-- [ ] T061 [P] [US1] Implement IMD weather client in backend/src/services/weather/imd_client.py
-- [ ] T062 [P] [US1] Implement OpenWeatherMap fallback client in backend/src/services/weather/openweather_client.py
-- [ ] T063 [US1] Implement weather service coordinator (IMD + fallback) in backend/src/services/weather/weather_service.py
-- [ ] T064 [P] [US1] Implement AGMARKNET mandi price client in backend/src/services/market/agmarknet_client.py
-- [ ] T065 [US1] Implement market price service with caching in backend/src/services/market/market_service.py
-- [ ] T066 [P] [US1] Implement location profile service (climate, soil, elevation) in backend/src/services/location/location_service.py
-- [ ] T067 [P] [US1] Implement soil profile service in backend/src/services/location/soil_service.py
+- [X] T059 [P] [US1] Implement Google Earth Engine integration in backend/src/services/satellite/gee_client.py
+- [X] T060 [P] [US1] Implement NDVI time-series fetcher in backend/src/services/satellite/ndvi_fetcher.py
+- [X] T061 [P] [US1] Implement IMD weather client in backend/src/services/weather/imd_client.py
+- [X] T062 [P] [US1] Implement OpenWeatherMap fallback client in backend/src/services/weather/openweather_client.py
+- [X] T063 [US1] Implement weather service coordinator (IMD + fallback) in backend/src/services/weather/weather_service.py
+- [X] T064 [P] [US1] Implement AGMARKNET mandi price client in backend/src/services/market/agmarknet_client.py
+- [X] T065 [US1] Implement market price service with caching in backend/src/services/market/market_service.py
+- [X] T066 [P] [US1] Implement location profile service (climate, soil, elevation) in backend/src/services/location/location_service.py
+- [X] T067 [P] [US1] Implement soil profile service in backend/src/services/location/soil_service.py
 
 ### Backend LLM Tools for User Story 1
 
-- [ ] T068 [P] [US1] Implement get_location_profile tool in backend/src/services/ai_tools/get_location_profile.py
-- [ ] T069 [P] [US1] Implement get_soil_profile tool in backend/src/services/ai_tools/get_soil_profile.py
-- [ ] T070 [P] [US1] Implement get_ndvi_timeseries tool in backend/src/services/ai_tools/get_ndvi_timeseries.py
-- [ ] T071 [P] [US1] Implement get_weather_forecast tool in backend/src/services/ai_tools/get_weather_forecast.py
-- [ ] T072 [P] [US1] Implement get_market_prices tool in backend/src/services/ai_tools/get_market_prices.py
-- [ ] T073 Register User Story 1 tools in tool registry in backend/src/services/ai/tool_registry.py
+- [X] T068 [P] [US1] Implement get_location_profile tool in backend/src/services/ai_tools/get_location_profile.py
+- [X] T069 [P] [US1] Implement get_soil_profile tool in backend/src/services/ai_tools/get_soil_profile.py
+- [X] T070 [P] [US1] Implement get_ndvi_timeseries tool in backend/src/services/ai_tools/get_ndvi_timeseries.py
+- [X] T071 [P] [US1] Implement get_weather_forecast tool in backend/src/services/ai_tools/get_weather_forecast.py
+- [X] T072 [P] [US1] Implement get_market_prices tool in backend/src/services/ai_tools/get_market_prices.py
+- [X] T073 Register User Story 1 tools in tool registry in backend/src/services/ai/tool_registry.py
 
 ### Backend API for User Story 1
 
-- [ ] T074 [US1] Implement farm snapshot generator service in backend/src/services/snapshot/snapshot_generator.py
-- [ ] T075 [US1] Implement GET /api/farm/snapshot endpoint in backend/src/api/routes/farm.py
-- [ ] T076 [US1] Add snapshot caching logic (4-hour TTL) in backend/src/services/snapshot/snapshot_cache.py
-- [ ] T077 [US1] Add validation and error handling for snapshot endpoint in backend/src/api/routes/farm.py
+- [X] T074 [US1] Implement farm snapshot generator service in backend/src/services/snapshot/snapshot_generator.py
+- [X] T075 [US1] Implement GET /api/farm/snapshot endpoint in backend/src/api/routes/farm.py
+- [X] T076 [US1] Add snapshot caching logic (4-hour TTL) in backend/src/services/snapshot/snapshot_cache.py
+- [X] T077 [US1] Add validation and error handling for snapshot endpoint in backend/src/api/routes/farm.py
 
 ### Frontend UI for User Story 1
 
-- [ ] T078 [P] [US1] Create FarmSelector component (map interface) in frontend/app/components/FarmSelector.tsx
-- [ ] T079 [P] [US1] Create FarmSnapshotCard component in frontend/app/components/FarmSnapshotCard.tsx
-- [ ] T080 [P] [US1] Create SoilSummary component in frontend/app/components/snapshot/SoilSummary.tsx
-- [ ] T081 [P] [US1] Create NDVITrend component with chart in frontend/app/components/snapshot/NDVITrend.tsx
-- [ ] T082 [P] [US1] Create WeatherForecast component in frontend/app/components/snapshot/WeatherForecast.tsx
-- [ ] T083 [P] [US1] Create MandiPrice component in frontend/app/components/snapshot/MandiPrice.tsx
-- [ ] T084 [P] [US1] Create TopActionCard component in frontend/app/components/snapshot/TopActionCard.tsx
-- [ ] T085 [US1] Create farm snapshot page route in frontend/app/routes/farm.$farmId.snapshot.tsx
-- [ ] T086 [US1] Add snapshot loading states and error handling in frontend/app/routes/farm.$farmId.snapshot.tsx
+- [X] T078 [P] [US1] Create FarmSelector component (map interface) in frontend/app/components/FarmSelector.tsx
+- [X] T079 [P] [US1] Create FarmSnapshotCard component in frontend/app/components/FarmSnapshotCard.tsx
+- [X] T080 [P] [US1] Create SoilSummary component in frontend/app/components/snapshot/SoilSummary.tsx
+- [X] T081 [P] [US1] Create NDVITrend component with chart in frontend/app/components/snapshot/NDVITrend.tsx
+- [X] T082 [P] [US1] Create WeatherForecast component in frontend/app/components/snapshot/WeatherForecast.tsx
+- [X] T083 [P] [US1] Create MandiPrice component in frontend/app/components/snapshot/MandiPrice.tsx
+- [X] T084 [P] [US1] Create TopActionCard component in frontend/app/components/snapshot/TopActionCard.tsx
+- [X] T085 [US1] Create farm snapshot page route in frontend/app/routes/farm.$farmId.snapshot.tsx
+- [X] T086 [US1] Add snapshot loading states and error handling in frontend/app/routes/farm.$farmId.snapshot.tsx
 
 ### Tests for User Story 1
 
-- [ ] T087 [P] [US1] Backend unit test for NDVI fetcher in backend/tests/unit/test_ndvi_fetcher.py
-- [ ] T088 [P] [US1] Backend unit test for weather service in backend/tests/unit/test_weather_service.py
-- [ ] T089 [P] [US1] Backend unit test for market service in backend/tests/unit/test_market_service.py
-- [ ] T090 [P] [US1] Backend integration test for snapshot generator in backend/tests/integration/test_snapshot_generator.py
-- [ ] T091 [P] [US1] Backend API test for /api/farm/snapshot in backend/tests/api/test_farm_snapshot.py
-- [ ] T092 [US1] Playwright E2E test for User Story 1 in frontend/tests/e2e/user-story-1.spec.ts
-- [ ] T093 [US1] Add Docker log capture utility for test failures in frontend/tests/utils/docker-logs.ts
-- [ ] T094 [US1] Add AI-powered auto-fix utility in frontend/tests/utils/auto-fix.ts
+- [X] T087 [P] [US1] Backend unit test for NDVI fetcher in backend/tests/unit/test_ndvi_fetcher.py
+- [X] T088 [P] [US1] Backend unit test for weather service in backend/tests/unit/test_weather_service.py
+- [X] T089 [P] [US1] Backend unit test for market service in backend/tests/unit/test_market_service.py
+- [X] T090 [P] [US1] Backend integration test for snapshot generator in backend/tests/integration/test_snapshot_generator.py
+- [X] T091 [P] [US1] Backend API test for /api/farm/snapshot in backend/tests/api/test_farm_snapshot.py
+- [X] T092 [US1] Playwright E2E test for User Story 1 in frontend/tests/e2e/user-story-1.spec.ts
+- [X] T093 [US1] Add Docker log capture utility for test failures in frontend/tests/utils/docker-logs.ts
+- [X] T094 [US1] Add AI-powered auto-fix utility in frontend/tests/utils/auto-fix.ts
 
 **Checkpoint**: User Story 1 (Farm Snapshot) is complete and independently testable. This forms the first half of the MVP.
 

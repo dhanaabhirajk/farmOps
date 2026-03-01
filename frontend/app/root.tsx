@@ -1,17 +1,16 @@
 import type { LinksFunction, MetaFunction } from "@remix-run/node";
 import {
   Links,
-  LiveReload,
   Meta,
   Outlet,
   Scripts,
   ScrollRestoration,
   useRouteError,
 } from "@remix-run/react";
-import stylesheet from "~/styles/tailwind.css";
+import tailwindStyles from "./styles/tailwind.css?url";
 
 export const links: LinksFunction = () => [
-  { rel: "stylesheet", href: stylesheet },
+  { rel: "stylesheet", href: tailwindStyles },
 ];
 
 export const meta: MetaFunction = () => {
@@ -37,7 +36,6 @@ export default function App() {
         <Outlet />
         <ScrollRestoration />
         <Scripts />
-        <LiveReload />
       </body>
     </html>
   );
