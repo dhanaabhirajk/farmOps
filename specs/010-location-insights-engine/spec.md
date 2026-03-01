@@ -171,13 +171,3 @@
 * **Testing**: create test fixtures for Tamil Nadu districts (Thanjavur, Coimbatore, Madurai) with historical mandi prices, satellite NDVI slices, and soil samples to validate end-to-end behavior. Unit test deterministic functions (yield formulas) and integration tests for AI interaction using recorded tool-call transcripts.
 * **Privacy**: use Supabase RLS policies to restrict farm data; offer export & deletion endpoints.
 * **Fallback UX**: when data missing, show a short-form question to farmer (e.g., "Is your soil heavy/clayey?") to allow manual override and keep flow moving.
-
----
-
-If you want, I can now:
-
-* Generate the **Supabase schema** for the entities above.
-* Draft the **Python tool interfaces** (signatures) that the LLM will call (e.g., `estimate_yield`, `get_market_prices`, `predict_price_trend`).
-* Create **sample test fixtures** for 3 Tamil Nadu pilot farms (Thanjavur rice, Coimbatore groundnut, Madurai tomato) and deterministic expected outputs for unit/integration tests.
-
-Which of those should I produce next?
