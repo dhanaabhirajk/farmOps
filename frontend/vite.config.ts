@@ -22,5 +22,12 @@ export default defineConfig({
     watch: {
       usePolling: true, // Needed for Docker
     },
+    proxy: {
+      "/api": {
+        target: "http://farmops-backend-dev:8000",
+        changeOrigin: true,
+        rewrite: (path) => path,
+      },
+    },
   },
 });

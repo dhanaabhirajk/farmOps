@@ -15,7 +15,7 @@ from ...services.snapshot.snapshot_generator import SnapshotGenerator
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/farm", tags=["recommendations"])
+router = APIRouter(prefix="", tags=["recommendations"])
 
 # Service instances (would be dependency-injected in production)
 crop_recommender = CropRecommender()

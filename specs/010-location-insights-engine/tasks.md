@@ -224,12 +224,12 @@ Every task follows: `- [ ] [TaskID] [P?] [Story?] Description with file path`
 
 ### Tests for User Story 2
 
-- [X] T117 [P] [US2] Backend unit test for yield estimator in backend/tests/unit/test_estimate_yield.py
-- [X] T118 [P] [US2] Backend unit test for profit calculator in backend/tests/unit/test_estimate_profit.py
-- [X] T119 [P] [US2] Backend unit test for risk scorer in backend/tests/unit/test_estimate_risk_score.py
-- [X] T120 [P] [US2] Backend integration test for crop recommender in backend/tests/integration/test_crop_recommender.py
-- [X] T121 [P] [US2] Backend API test for /api/farm/recommendations in backend/tests/api/test_recommendations.py
-- [X] T122 [US2] Playwright E2E test for User Story 2 in frontend/tests/e2e/user-story-2.spec.ts
+- [ ] T117 [P] [US2] Backend unit test for yield estimator in backend/tests/unit/test_estimate_yield.py
+- [ ] T118 [P] [US2] Backend unit test for profit calculator in backend/tests/unit/test_estimate_profit.py
+- [ ] T119 [P] [US2] Backend unit test for risk scorer in backend/tests/unit/test_estimate_risk_score.py
+- [ ] T120 [P] [US2] Backend integration test for crop recommender in backend/tests/integration/test_crop_recommender.py
+- [ ] T121 [P] [US2] Backend API test for /api/farm/recommendations in backend/tests/api/test_recommendations.py
+- [ ] T122 [US2] Playwright E2E test for User Story 2 in frontend/tests/e2e/user-story-2.spec.ts
 
 **Checkpoint**: User Story 2 (Crop Recommendation) is complete. MVP is now fully functional (US1 + US2).
 

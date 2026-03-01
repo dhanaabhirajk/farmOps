@@ -4,10 +4,10 @@
  * Allows farmers to get crop recommendations for their farm based on season.
  */
 
-import type { LoaderFunctionArgs, MetaFunction } from "@remix-run/node";
+import type { ActionFunctionArgs, LoaderFunctionArgs, MetaFunction } from "@remix-run/node";
 import { json } from "@remix-run/node";
-import { Form, useLoaderData, useNavigation } from "@remix-run/react";
-import { useState } from "react";
+import { Form, useLoaderData, useNavigation, useFetcher } from "@remix-run/react";
+import { useState, useEffect } from "react";
 import { CropRecommendationCard } from "~/components/recommendations/CropRecommendationCard";
 import type { CropRecommendation } from "~/components/recommendations/CropRecommendationCard";
 import { Button } from "~/components/ui/Button";
@@ -26,6 +26,23 @@ interface LoaderData {
   seasons: string[];
 }
 
+interface RecommendationResponse {
+  success: boolean;
+  data?: {
+    recommended_crops: CropRecommendation[];
+    season: string;
+    confidence: number;
+    explanation: string;
+    tool_calls: Array<any>;
+  };
+  error?: string;
+  metadata?: {
+    cached: boolean;
+    response_time_ms: number;
+    timestamp: string;
+  };
+}
+
 export async function loader({ params }: LoaderFunctionArgs) {
   const farmId = params.farmId || "00000000-0000-0000-0000-000000000000";
   
@@ -35,51 +52,65 @@ export async function loader({ params }: LoaderFunctionArgs) {
   return json<LoaderData>({ farmId, seasons });
 }
 
+export async function action({ request, params }: ActionFunctionArgs) {
+  if (request.method !== "POST") {
+    return json({ error: "Method not allowed" }, { status: 405 });
+  }
+
+  const farmId = params.farmId;
+  const formData = await request.formData();
+  const season = formData.get("season") as string;
+
+  try {
+    // Call backend API (using relative path - will be proxied by Remix)
+    const backendUrl = process.env.BACKEND_URL || "http://farmops-backend-dev:8000";
+    const response = await fetch(`${backendUrl}/api/v1/farm/recommendations`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        farm_id: farmId,
+        season: season,
+        use_cache: true,
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Backend error: ${response.status}`);
+    }
+
+    const result = (await response.json()) as RecommendationResponse;
+    return json(result);
+  } catch (err) {
+    return json(
+      { 
+        success: false, 
+        error: err instanceof Error ? err.message : "Failed to get recommendations" 
+      } as RecommendationResponse
+    );
+  }
+}
+
 export default function FarmRecommendations() {
   const { farmId, seasons } = useLoaderData<typeof loader>();
-  const navigation = useNavigation();
+  const fetcher = useFetcher<RecommendationResponse>();
   const [selectedSeason, setSelectedSeason] = useState<string>("Samba");
   const [recommendations, setRecommendations] = useState<CropRecommendation[] | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [confidence, setConfidence] = useState<number>(0);
 
-  const handleGetRecommendations = async () => {
-    setLoading(true);
-    setError(null);
-    
-    try {
-      const response = await fetch("/api/farm/recommendations", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          farm_id: farmId,
-          season: selectedSeason,
-          use_cache: true,
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+  // Handle fetcher state changes
+  useEffect(() => {
+    if (fetcher.data) {
+      if (fetcher.data.success && fetcher.data.data) {
+        setRecommendations(fetcher.data.data.recommended_crops || []);
+        setConfidence(fetcher.data.data.confidence || 0);
       }
-
-      const result = await response.json();
-      
-      if (result.success && result.data) {
-        setRecommendations(result.data.recommended_crops || []);
-        setConfidence(result.data.confidence || 0);
-      } else {
-        throw new Error(result.error || "Failed to get recommendations");
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "An error occurred");
-      setRecommendations(null);
-    } finally {
-      setLoading(false);
     }
-  };
+  }, [fetcher.data]);
+
+  const isLoading = fetcher.state === "submitting";
+  const error = fetcher.data?.success === false ? fetcher.data.error : null;
 
   return (
     <div className="min-h-screen bg-gray-50 p-4 md:p-8">
@@ -97,36 +128,41 @@ export default function FarmRecommendations() {
         {/* Season Selection */}
         <Card className="p-6 mb-6">
           <h2 className="text-xl font-semibold mb-4">Select Season</h2>
-          <div className="flex flex-wrap gap-3 mb-4">
-            {seasons.map((season) => (
-              <button
-                key={season}
-                onClick={() => setSelectedSeason(season)}
-                className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                  selectedSeason === season
-                    ? "bg-blue-600 text-white"
-                    : "bg-gray-200 text-gray-700 hover:bg-gray-300"
-                }`}
-              >
-                {season}
-              </button>
-            ))}
-          </div>
-          
-          <Button
-            onClick={handleGetRecommendations}
-            disabled={loading}
-            className="w-full md:w-auto"
-          >
-            {loading ? (
-              <>
-                <Spinner size="sm" className="mr-2" />
-                Generating Recommendations...
-              </>
-            ) : (
-              "Get Recommendations"
-            )}
-          </Button>
+          <fetcher.Form method="POST" className="space-y-4">
+            <div className="flex flex-wrap gap-3 mb-4">
+              {seasons.map((season) => (
+                <button
+                  key={season}
+                  type="button"
+                  onClick={() => setSelectedSeason(season)}
+                  className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                    selectedSeason === season
+                      ? "bg-blue-600 text-white"
+                      : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+                  }`}
+                >
+                  {season}
+                </button>
+              ))}
+            </div>
+
+            <input type="hidden" name="season" value={selectedSeason} />
+            
+            <button
+              type="submit"
+              disabled={isLoading}
+              className="w-full md:w-auto px-6 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 disabled:bg-gray-400"
+            >
+              {isLoading ? (
+                <>
+                  <Spinner size="sm" className="mr-2 inline-block" />
+                  Generating Recommendations...
+                </>
+              ) : (
+                "Get Recommendations"
+              )}
+            </button>
+          </fetcher.Form>
         </Card>
 
         {/* Error Message */}
@@ -178,7 +214,7 @@ export default function FarmRecommendations() {
         )}
 
         {/* Empty State */}
-        {!loading && !recommendations && !error && (
+        {!isLoading && !recommendations && !error && (
           <Card className="p-12 text-center">
             <div className="text-gray-400 mb-4">
               <svg

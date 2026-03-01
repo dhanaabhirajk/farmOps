@@ -90,10 +90,11 @@ class CropKnowledge:
             },
             "Groundnut": {
                 "scientific_name": "Arachis hypogaea",
-                "seasons": ["Kharif", "Rabi"],
+                "seasons": ["Kharif", "Rabi", "Samba"],
                 "planting_windows": {
                     "Kharif": {"start": "06-01", "end": "07-15"},
                     "Rabi": {"start": "10-15", "end": "11-30"},
+                    "Samba": {"start": "08-15", "end": "09-30"},
                 },
                 "duration_days": 110,
                 "water_requirement_mm": 500,
