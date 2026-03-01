@@ -34,6 +34,9 @@ frontend/dist/
 # Test and logs
 coverage/
 *.log
+.playwright-mcp/
+frontend/playwright-report/
+frontend/test-results/
 
 # IDE
 .vscode/
