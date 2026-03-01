@@ -1,0 +1,209 @@
+/**
+ * Crop Recommendations Route
+ * 
+ * Allows farmers to get crop recommendations for their farm based on season.
+ */
+
+import type { LoaderFunctionArgs, MetaFunction } from "@remix-run/node";
+import { json } from "@remix-run/node";
+import { Form, useLoaderData, useNavigation } from "@remix-run/react";
+import { useState } from "react";
+import { CropRecommendationCard } from "~/components/recommendations/CropRecommendationCard";
+import type { CropRecommendation } from "~/components/recommendations/CropRecommendationCard";
+import { Button } from "~/components/ui/Button";
+import { Card } from "~/components/ui/Card";
+import { Spinner } from "~/components/ui/Spinner";
+
+export const meta: MetaFunction = () => {
+  return [
+    { title: "Crop Recommendations - FarmOps" },
+    { name: "description", content: "Get AI-powered crop recommendations for your farm" },
+  ];
+};
+
+interface LoaderData {
+  farmId: string;
+  seasons: string[];
+}
+
+export async function loader({ params }: LoaderFunctionArgs) {
+  const farmId = params.farmId || "00000000-0000-0000-0000-000000000000";
+  
+  // Available seasons for Tamil Nadu
+  const seasons = ["Kharif", "Rabi", "Summer", "Kar", "Samba", "Thaladi"];
+  
+  return json<LoaderData>({ farmId, seasons });
+}
+
+export default function FarmRecommendations() {
+  const { farmId, seasons } = useLoaderData<typeof loader>();
+  const navigation = useNavigation();
+  const [selectedSeason, setSelectedSeason] = useState<string>("Samba");
+  const [recommendations, setRecommendations] = useState<CropRecommendation[] | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [confidence, setConfidence] = useState<number>(0);
+
+  const handleGetRecommendations = async () => {
+    setLoading(true);
+    setError(null);
+    
+    try {
+      const response = await fetch("/api/farm/recommendations", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          farm_id: farmId,
+          season: selectedSeason,
+          use_cache: true,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const result = await response.json();
+      
+      if (result.success && result.data) {
+        setRecommendations(result.data.recommended_crops || []);
+        setConfidence(result.data.confidence || 0);
+      } else {
+        throw new Error(result.error || "Failed to get recommendations");
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "An error occurred");
+      setRecommendations(null);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-gray-50 p-4 md:p-8">
+      <div className="max-w-6xl mx-auto">
+        {/* Header */}
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">
+            Crop Recommendations
+          </h1>
+          <p className="text-gray-600">
+            Get AI-powered crop recommendations based on your farm's soil, climate, and market conditions
+          </p>
+        </div>
+
+        {/* Season Selection */}
+        <Card className="p-6 mb-6">
+          <h2 className="text-xl font-semibold mb-4">Select Season</h2>
+          <div className="flex flex-wrap gap-3 mb-4">
+            {seasons.map((season) => (
+              <button
+                key={season}
+                onClick={() => setSelectedSeason(season)}
+                className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                  selectedSeason === season
+                    ? "bg-blue-600 text-white"
+                    : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+                }`}
+              >
+                {season}
+              </button>
+            ))}
+          </div>
+          
+          <Button
+            onClick={handleGetRecommendations}
+            disabled={loading}
+            className="w-full md:w-auto"
+          >
+            {loading ? (
+              <>
+                <Spinner size="sm" className="mr-2" />
+                Generating Recommendations...
+              </>
+            ) : (
+              "Get Recommendations"
+            )}
+          </Button>
+        </Card>
+
+        {/* Error Message */}
+        {error && (
+          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
+            <p className="text-red-700 font-medium">Error: {error}</p>
+          </div>
+        )}
+
+        {/* Recommendations */}
+        {recommendations && recommendations.length > 0 && (
+          <>
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="text-2xl font-semibold text-gray-900">
+                Top Recommendations for {selectedSeason} Season
+              </h2>
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-gray-600">Confidence:</span>
+                <span className="text-lg font-bold text-blue-600">
+                  {confidence.toFixed(0)}%
+                </span>
+              </div>
+            </div>
+
+            <div className="grid gap-6 md:grid-cols-1 lg:grid-cols-1">
+              {recommendations.map((rec, index) => (
+                <CropRecommendationCard
+                  key={`${rec.crop_name}-${index}`}
+                  recommendation={rec}
+                  isTopChoice={index === 0}
+                />
+              ))}
+            </div>
+
+            {/* Additional Info */}
+            <Card className="mt-6 p-6 bg-blue-50">
+              <h3 className="font-semibold text-blue-900 mb-2">
+                ℹ️ How to Use These Recommendations
+              </h3>
+              <ul className="text-sm text-blue-800 space-y-1">
+                <li>• Rankings are based on expected profit adjusted for risk</li>
+                <li>• Profit estimates include current market prices and production costs</li>
+                <li>• Plant within the recommended window for best results</li>
+                <li>• Consider your available resources (water, labor, capital)</li>
+                <li>• Diversify crops to reduce overall risk</li>
+              </ul>
+            </Card>
+          </>
+        )}
+
+        {/* Empty State */}
+        {!loading && !recommendations && !error && (
+          <Card className="p-12 text-center">
+            <div className="text-gray-400 mb-4">
+              <svg
+                className="w-16 h-16 mx-auto"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                />
+              </svg>
+            </div>
+            <h3 className="text-lg font-medium text-gray-900 mb-2">
+              No Recommendations Yet
+            </h3>
+            <p className="text-gray-600">
+              Select a season and click "Get Recommendations" to see AI-powered crop suggestions
+            </p>
+          </Card>
+        )}
+      </div>
+    </div>
+  );
+}

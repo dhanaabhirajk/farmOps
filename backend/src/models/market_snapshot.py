@@ -3,7 +3,7 @@
 from datetime import date
 from uuid import UUID
 
-from sqlalchemy import Column, Date, Integer, Numeric, String
+from sqlalchemy import Column, Date, Index, Integer, Numeric, String
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import relationship
 
@@ -36,16 +36,8 @@ class MarketSnapshot(Base, UUIDMixin, TimestampMixin):
     data_source = Column(String(50), nullable=False, default="AGMARKNET")
 
     __table_args__ = (
-        # Composite index for price history queries
-        ("idx_market_snapshots_market_commodity_date", {
-            "postgresql_using": "btree",
-            "postgresql_where": None
-        }),
-        # Index for recent prices
-        ("idx_market_snapshots_snapshot_date", {
-            "postgresql_using": "btree",
-            "postgresql_where": None
-        }),
+        Index('idx_market_snapshots_market_commodity_date', 'market_id', 'commodity', 'snapshot_date'),
+        Index('idx_market_snapshots_snapshot_date', 'snapshot_date'),
     )
 
     def __repr__(self) -> str:

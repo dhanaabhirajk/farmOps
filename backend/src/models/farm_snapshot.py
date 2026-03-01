@@ -3,7 +3,7 @@
 from datetime import date
 from uuid import UUID
 
-from sqlalchemy import Column, Date, ForeignKey, Integer
+from sqlalchemy import Column, Date, ForeignKey, Integer, UniqueConstraint
 from sqlalchemy.dialects.postgresql import JSONB, UUID as PGUUID
 from sqlalchemy.orm import relationship
 
@@ -35,11 +35,7 @@ class FarmSnapshot(Base, UUIDMixin, TimestampMixin):
     farm = relationship("Farm", foreign_keys=[farm_id])
 
     __table_args__ = (
-        # Unique constraint: only one snapshot per farm per date
-        ("farm_snapshots_unique_farm_date", {
-            "postgresql_using": "btree",
-            "postgresql_where": None
-        }),
+        UniqueConstraint('farm_id', 'snapshot_date', name='farm_snapshots_unique_farm_date'),
     )
 
     def __repr__(self) -> str:
