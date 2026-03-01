@@ -29,13 +29,13 @@ Every task follows: `- [ ] [TaskID] [P?] [Story?] Description with file path`
 - [X] T001 Initialize backend Python project with uv package manager in backend/
 - [X] T002 [P] Initialize frontend Remix project with TypeScript in frontend/
 - [X] T003 [P] Create docker-compose.dev.yml with services: backend, frontend, supabase
-- [ ] T004 [P] Create docker-compose.prod.yml with optimized multi-stage builds
+- [X] T004 [P] Create docker-compose.prod.yml with optimized multi-stage builds
 - [X] T005 [P] Create Dockerfile.backend with Python 3.11+ and FastAPI dependencies
 - [X] T006 [P] Create Dockerfile.frontend with Node.js and Remix build
 - [X] T007 [P] Create .env.dev with mock environment variables (no API keys required)
 - [X] T008 [P] Create .env.example documenting all required environment variables
 - [X] T009 [P] Configure backend linting (ruff, mypy) in backend/pyproject.toml
-- [ ] T010 [P] Configure frontend linting (ESLint, Prettier) in frontend/.eslintrc.js
+- [X] T010 [P] Configure frontend linting (ESLint, Prettier) in frontend/.eslintrc.js
 - [X] T011 Install Python dependencies: fastapi, uvicorn, supabase-py, shapely, rasterio, earthengine-api in backend/
 - [X] T012 [P] Install frontend dependencies: remix, react, tailwindcss in frontend/
 - [X] T013 [P] Setup Cloudflare configuration in wrangler.toml for Pages deployment
@@ -184,27 +184,27 @@ Every task follows: `- [ ] [TaskID] [P?] [Story?] Description with file path`
 
 ### Database for User Story 2
 
-- [ ] T095 [US2] Create migration for recommendations table in supabase/migrations/011_recommendations.sql
-- [ ] T096 [P] [US2] Create indexes for recommendations (farm_id, type, created_at) in supabase/migrations/011_recommendations.sql
+- [X] T095 [US2] Create migration for recommendations table in supabase/migrations/011_recommendations.sql
+- [X] T096 [P] [US2] Create indexes for recommendations (farm_id, type, created_at) in supabase/migrations/011_recommendations.sql
 
 ### Backend Models for User Story 2
 
-- [ ] T097 [US2] Create Recommendation model in backend/src/models/recommendation.py
+- [X] T097 [US2] Create Recommendation model in backend/src/models/recommendation.py
 - [ ] T098 [US2] Create RecommendationPayload schema in backend/src/models/schemas/recommendation_payload.py
 
 ### Backend LLM Tools for User Story 2
 
-- [ ] T099 [P] [US2] Implement estimate_yield tool in backend/src/services/ai_tools/estimate_yield.py
-- [ ] T100 [P] [US2] Implement estimate_production_cost tool in backend/src/services/ai_tools/estimate_production_cost.py
-- [ ] T101 [P] [US2] Implement estimate_risk_score tool in backend/src/services/ai_tools/estimate_risk_score.py
-- [ ] T102 [P] [US2] Implement estimate_profit tool in backend/src/services/ai_tools/estimate_profit.py
+- [X] T099 [P] [US2] Implement estimate_yield tool in backend/src/services/ai_tools/estimate_yield.py
+- [X] T100 [P] [US2] Implement estimate_production_cost tool in backend/src/services/ai_tools/estimate_production_cost.py
+- [X] T101 [P] [US2] Implement estimate_risk_score tool in backend/src/services/ai_tools/estimate_risk_score.py
+- [X] T102 [P] [US2] Implement estimate_profit tool in backend/src/services/ai_tools/estimate_profit.py
 - [ ] T103 Register User Story 2 tools in tool registry in backend/src/services/ai/tool_registry.py
 
 ### Backend Services for User Story 2
 
-- [ ] T104 [US2] Implement crop knowledge base (planting calendars, water needs) in backend/src/services/recommendations/crop_knowledge.py
-- [ ] T105 [US2] Implement crop recommendation engine in backend/src/services/recommendations/crop_recommender.py
-- [ ] T106 [US2] Implement recommendation caching service in backend/src/services/recommendations/recommendation_cache.py
+- [X] T104 [US2] Implement crop knowledge base (planting calendars, water needs) in backend/src/services/recommendations/crop_knowledge.py
+- [X] T105 [US2] Implement crop recommendation engine in backend/src/services/recommendations/crop_recommender.py
+- [X] T106 [US2] Implement recommendation caching service in backend/src/services/recommendations/recommendation_cache.py
 
 ### Backend API for User Story 2
 
