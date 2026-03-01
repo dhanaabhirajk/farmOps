@@ -31,6 +31,7 @@ class Farm(Base, UUIDMixin, TimestampMixin):
     user = relationship("User", back_populates="farms")
     audit_logs = relationship("DataAuditLog", back_populates="farm")
     user_actions = relationship("UserAction", back_populates="farm")
+    recommendations = relationship("Recommendation", back_populates="farm")
 
     def __repr__(self) -> str:
         """String representation."""

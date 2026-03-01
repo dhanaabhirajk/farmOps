@@ -11,7 +11,7 @@ This guide walks you through setting up the Location-Based Insights Engine local
 
 - **Docker Desktop** (Mac/Windows) or **Docker + Docker Compose** (Linux)
 - **Git**
-- Modern browser (Chrome, Firefox, Safari)
+- Modern browser (Chrome)
 - Internet connection (for first-run data fetching)
 
 ---

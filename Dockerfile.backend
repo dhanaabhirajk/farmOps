@@ -1,5 +1,5 @@
 # Multi-stage Dockerfile for FastAPI backend
-FROM python:3.11-slim as base
+FROM python:3.11-slim AS base
 
 WORKDIR /app
 
@@ -17,28 +17,32 @@ RUN apt-get update && apt-get install -y \
 RUN pip install --no-cache-dir uv
 
 # Development stage
-FROM base as development
+FROM base AS development
 
-# Copy project files
+# Copy only dependency files (for better layer caching)
 COPY pyproject.toml README.md ./
-COPY src ./src
 
 # Install dependencies
 RUN uv pip install --system -e ".[dev]"
+
+# Copy source code (after dependencies are installed)
+COPY src ./src
 
 EXPOSE 8000
 
 CMD ["uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
 
 # Production stage
-FROM base as production
+FROM base AS production
 
-# Copy project files
+# Copy only dependency files (for better layer caching)
 COPY pyproject.toml README.md ./
-COPY src ./src
 
 # Install only production dependencies
 RUN uv pip install --system .
+
+# Copy source code (after dependencies are installed)
+COPY src ./src
 
 # Create non-root user
 RUN useradd -m -u 1000 farmops && chown -R farmops:farmops /app
