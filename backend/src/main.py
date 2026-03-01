@@ -2,6 +2,8 @@
 
 import logging
 import os
+from contextlib import asynccontextmanager
+from typing import AsyncGenerator
 
 from dotenv import load_dotenv
 from fastapi import FastAPI
@@ -21,6 +23,23 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
+    """Application lifespan — runs setup on startup, cleanup on shutdown."""
+    # ── Startup ────────────────────────────────────────────────────────────
+    from .services.ai.setup_tools import setup_all_tools
+
+    logger.info("Registering AI tools with tool registry...")
+    await setup_all_tools()
+    logger.info("AI tools registered. LLM agent ready.")
+
+    yield  # Application runs here
+
+    # ── Shutdown ───────────────────────────────────────────────────────────
+    logger.info("FarmOps backend shutting down.")
+
+
 # Create FastAPI app
 app = FastAPI(
     title="FarmOps Location-Based Insights Engine",
@@ -28,6 +47,7 @@ app = FastAPI(
     version="0.1.0",
     docs_url="/docs",
     redoc_url="/redoc",
+    lifespan=lifespan,
 )
 
 # CORS configuration

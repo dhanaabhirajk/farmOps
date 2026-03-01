@@ -1,6 +1,7 @@
 """Farm API routes including snapshot endpoint."""
 
 import logging
+from datetime import datetime, timezone
 from typing import Optional
 from uuid import UUID
 
@@ -9,7 +10,7 @@ from pydantic import BaseModel
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/farm", tags=["farm"])
+router = APIRouter(prefix="", tags=["farm"])
 
 
 class FarmSnapshotRequest(BaseModel):
@@ -27,115 +28,107 @@ class FarmSnapshotResponse(BaseModel):
 @router.get("/snapshot")
 async def get_farm_snapshot(
     farm_id: str = Query(..., description="Farm UUID"),
+    lat: Optional[float] = Query(None, description="Farm centroid latitude"),
+    lon: Optional[float] = Query(None, description="Farm centroid longitude"),
+    district: Optional[str] = Query(None, description="District name"),
+    main_crop: str = Query("Rice", description="Primary crop grown on this farm"),
+    area_acres: float = Query(5.0, description="Farm area in acres"),
     use_cache: bool = Query(True, description="Use cached snapshot if available"),
 ) -> FarmSnapshotResponse:
     """
-    Get farm snapshot with location, soil, weather, NDVI, market data.
-    
+    Get farm snapshot with location, soil, weather, NDVI, and live market data.
+
+    The LLM agent (Mistral) calls tools to fetch real-time weather, satellite
+    NDVI, and mandi prices before generating an AI-reasoned top action.
+
     Query Parameters:
     - farm_id: UUID of the farm
+    - lat: Latitude of farm centroid (optional, defaults to Thanjavur)
+    - lon: Longitude of farm centroid (optional, defaults to Thanjavur)
+    - district: District name for localised market prices (optional)
+    - main_crop: Primary crop for market price lookup (default: Rice)
+    - area_acres: Farm area in acres (default: 5.0)
     - use_cache: Whether to use cached snapshot (default: true)
-    
+
     Returns:
-    - snapshot: Comprehensive farm data
+    - snapshot payload with weather, NDVI, soil, market, and top action
     - confidence: Overall confidence score (0-100)
-    - sources_used: Data sources included
-    
+    - sources_used: Data sources queried
+    - llm_audit: Tool calls made by the LLM agent
+
     Performance:
     - Cached: <300ms
     - Cold: <8s
     """
     try:
-        # Parse farm_id
+        # Validate farm_id
         try:
             farm_uuid = UUID(farm_id)
         except ValueError:
             raise HTTPException(status_code=400, detail="Invalid farm_id format")
 
-        # TODO: Implement actual snapshot logic
-        # 1. Check cache
-        # 2. If cache miss, generate snapshot
-        # 3. Fetch all data layers in parallel
-        # 4. Compile response
-        # 5. Cache result
+        from ...services.snapshot.snapshot_generator import SnapshotGenerator
+        from ...services.snapshot.snapshot_cache import SnapshotCache
 
-        # For MVP, return mock response
-        snapshot_data = {
-            "farm": {
-                "id": farm_id,
-                "name": "Sample Farm",
-                "area_acres": 5.2,
-                "location": {"lat": 11.0168, "lon": 76.8194},
+        cache = SnapshotCache()
+
+        # Check cache first
+        if use_cache:
+            cached = cache.get_cached_snapshot(farm_uuid)
+            if cached:
+                return FarmSnapshotResponse(
+                    success=True,
+                    data=cached,
+                    metadata={
+                        "cached": True,
+                        "timestamp": datetime.now(timezone.utc).isoformat(),
+                        "version": "1.0",
+                    },
+                )
+
+        # Build farm_data from query params
+        # In production this would be fetched from Supabase by farm_uuid
+        farm_data = {
+            "name": f"Farm {str(farm_uuid)[:8]}",
+            "centroid": {
+                "coordinates": [
+                    lon if lon is not None else 79.1378,   # lon (Thanjavur default)
+                    lat if lat is not None else 10.7870,   # lat (Thanjavur default)
+                ],
             },
-            "soil_summary": {
-                "type": "Clay-loam",
-                "pH": 7.2,
-                "organic_carbon_pct": 2.1,
-                "status": "healthy",
-                "confidence": 0.85,
-                "data_age_hours": 45,
-            },
-            "ndvi_trend": {
-                "current_value": 0.68,
-                "last_7_days": [0.62, 0.63, 0.65, 0.66, 0.67, 0.68, 0.68],
-                "trend": "increasing",
-                "confidence": 0.92,
-                "data_age_hours": 12,
-            },
-            "weather": {
-                "current": {
-                    "temperature_c": 28.5,
-                    "humidity_pct": 72,
-                    "wind_speed_kmh": 8,
-                    "condition": "partly-cloudy",
-                },
-                "forecast_7_days": [],
-                "last_updated_hours_ago": 2,
-            },
-            "nearest_mandi_price": {
-                "market": "Koyambedu",
-                "distance_km": 12,
-                "commodity": "Rice",
-                "modal_price": 1900,
-                "trend_30days": "stable",
-                "currency": "INR",
-            },
-            "top_action": {
-                "priority": "high",
-                "text": "Water today: Soil moisture low at 10cm",
-                "reason": "Forecast shows no rain in 24h",
-                "confidence": 0.92,
-            },
-            "data_freshness": {
-                "weather": "2h",
-                "ndvi": "12h",
-                "soil": "45d",
-                "market_price": "1h",
-            },
+            "area_acres": area_acres,
+            "district": district or "Thanjavur",
         }
+
+        # Generate snapshot using LLM agent
+        generator = SnapshotGenerator()
+        result = await generator.generate_farm_snapshot(
+            farm_id=farm_uuid,
+            farm_data=farm_data,
+            main_crop=main_crop,
+        )
+
+        # Cache the result
+        cache.cache_snapshot(farm_uuid, result.get("payload", {}))
 
         return FarmSnapshotResponse(
             success=True,
-            data=snapshot_data,
+            data=result.get("payload"),
             metadata={
-                "timestamp": "2026-02-28T10:30:00Z",
+                "cached": False,
+                "timestamp": result.get("generated_at", datetime.now(timezone.utc).isoformat()),
                 "version": "1.0",
-                "request_id": "req_abc123def456",
-                "confidence": 85,
-                "sources": [
-                    "LocationProfile",
-                    "SoilProfile",
-                    "WeatherSnapshot",
-                    "VegTimeSeries",
-                    "MarketSnapshot",
-                ],
+                "confidence": result.get("confidence_overall"),
+                "sources": result.get("sources_used", []),
+                "response_time_ms": result.get("response_time_ms"),
+                "llm_audit": result.get("llm_audit"),
             },
         )
 
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error generating farm snapshot: {e}")
+        logger.error(f"Error generating farm snapshot: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail="Error generating farm snapshot")
 
 
