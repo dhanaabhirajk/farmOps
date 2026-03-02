@@ -4,13 +4,22 @@
 
 ## Overview
 
-FarmOps provides actionable, explainable agricultural insights for farmers by analyzing farm locations and generating data-driven recommendations covering:
+The global agriculture industry, valued at over **$3.5 trillion annually**, relies heavily on small and medium-scale farmers. However, many lack access to real-time financial insights, market intelligence, and predictive tools, leading to income losses of 10–30% due to poor planning, price volatility, and inefficient harvest timing.
 
-- **Farm Snapshot**: Real-time climate, soil, weather, NDVI satellite data, and market prices
-- **Crop Recommendations**: Profit forecasts, planting windows, water requirements, and risk scores
-- **Irrigation Scheduling**: 14-day irrigation plans based on soil moisture and weather
-- **Harvest Timing**: Sell vs store recommendations with price forecasts
-- **Subsidy Matching**: Government scheme eligibility checking
+FarmOps is an AI-powered farm intelligence platform that helps farmers identify crops, predict profits, optimize harvest timing, and receive personalized recommendations. By leveraging real-time environmental, financial, and agricultural data, FarmOps reduces uncertainty, improves decision-making, and helps farmers maximize profitability while simplifying farm management.
+
+---
+
+## Key Features
+
+**Crop Intelligence:** Identifies crop type, growth stage, and health to estimate yield and predict profits.
+
+**Predictive Financial and Market Analysis:** Forecasts market prices, revenue, and recommends optimal harvest timing.
+
+**Government Scheme Discovery:** Connects farmers with relevant subsidies and agricultural programs.
+
+**AI-Driven Decision Support:** Provides real-time, data-driven recommendations for smarter farm management.
+
 
 ## Tech Stack
 
