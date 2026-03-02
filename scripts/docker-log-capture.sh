@@ -14,19 +14,19 @@ echo "Log directory: $LOG_DIR"
 
 # Capture backend logs (last 500 lines)
 echo "Capturing backend logs..."
-docker-compose -f docker-compose.dev.yml logs --tail=500 backend > "$LOG_DIR/backend.log" 2>&1 || echo "Backend container not running"
+docker compose -f docker-compose.dev.yml logs --tail=500 backend > "$LOG_DIR/backend.log" 2>&1 || echo "Backend container not running"
 
 # Capture frontend logs
 echo "Capturing frontend logs..."
-docker-compose -f docker-compose.dev.yml logs --tail=500 frontend > "$LOG_DIR/frontend.log" 2>&1 || echo "Frontend container not running"
+docker compose -f docker-compose.dev.yml logs --tail=500 frontend > "$LOG_DIR/frontend.log" 2>&1 || echo "Frontend container not running"
 
 # Capture database logs
 echo "Capturing database logs..."
-docker-compose -f docker-compose.dev.yml logs --tail=500 supabase > "$LOG_DIR/supabase.log" 2>&1 || echo "Supabase container not running"
+docker compose -f docker-compose.dev.yml logs --tail=500 supabase > "$LOG_DIR/supabase.log" 2>&1 || echo "Supabase container not running"
 
 # Capture container stats
 echo "Capturing container status..."
-docker-compose -f docker-compose.dev.yml ps > "$LOG_DIR/container-status.txt" 2>&1 || echo "Docker compose not running"
+docker compose -f docker-compose.dev.yml ps > "$LOG_DIR/container-status.txt" 2>&1 || echo "Docker compose not running"
 
 # Save environment info
 echo "Capturing environment info..."
@@ -38,7 +38,7 @@ echo "Capturing environment info..."
     docker --version
     echo ""
     echo "=== Docker Compose Version ==="
-    docker-compose --version
+    docker compose version
     echo ""
     echo "=== Disk Usage ==="
     df -h

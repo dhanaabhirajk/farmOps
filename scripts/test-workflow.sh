@@ -68,7 +68,7 @@ while [ $attempt -le $((MAX_FIX_ATTEMPTS + 1)) ]; do
             log_dir=$(cat ./test-results/last-log-path.txt)
             if attempt_autofix "$log_dir"; then
                 echo "🔄 Auto-fix applied - restarting containers..."
-                docker-compose -f docker-compose.dev.yml restart
+                docker compose -f docker-compose.dev.yml restart
                 sleep 10  # Wait for services to stabilize
                 ((attempt++))
             else
