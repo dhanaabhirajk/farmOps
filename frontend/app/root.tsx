@@ -5,6 +5,7 @@ import {
   Outlet,
   Scripts,
   ScrollRestoration,
+  useNavigation,
   useRouteError,
 } from "@remix-run/react";
 // @ts-ignore – Vite handles ?url at build time; tsc cannot resolve this
@@ -26,6 +27,9 @@ export const meta: MetaFunction = () => {
 };
 
 export default function App() {
+  const navigation = useNavigation();
+  const isNavigating = navigation.state === "loading";
+
   return (
     <html lang="ta">
       <head>
@@ -34,6 +38,12 @@ export default function App() {
         <Links />
       </head>
       <body className="min-h-screen bg-gray-50">
+        {/* Global top progress bar */}
+        {isNavigating && (
+          <div className="fixed top-0 left-0 right-0 z-50 h-1 bg-green-100">
+            <div className="h-1 bg-green-500 animate-pulse" style={{ width: "70%" }} />
+          </div>
+        )}
         <Outlet />
         <ScrollRestoration />
         <Scripts />

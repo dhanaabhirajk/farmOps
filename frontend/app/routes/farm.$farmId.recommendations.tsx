@@ -6,7 +6,7 @@
 
 import type { ActionFunctionArgs, LoaderFunctionArgs, MetaFunction } from "@remix-run/node";
 import { json } from "@remix-run/node";
-import { Form, useLoaderData, useNavigation, useFetcher } from "@remix-run/react";
+import { Form, Link, useLoaderData, useNavigation, useFetcher, useSearchParams } from "@remix-run/react";
 import { useState, useEffect } from "react";
 import { CropRecommendationCard } from "~/components/recommendations/CropRecommendationCard";
 import type { CropRecommendation } from "~/components/recommendations/CropRecommendationCard";
@@ -23,6 +23,7 @@ export const meta: MetaFunction = () => {
 
 interface LoaderData {
   farmId: string;
+  farmName: string;
   seasons: string[];
 }
 
@@ -43,13 +44,15 @@ interface RecommendationResponse {
   };
 }
 
-export async function loader({ params }: LoaderFunctionArgs) {
+export async function loader({ params, request }: LoaderFunctionArgs) {
   const farmId = params.farmId || "00000000-0000-0000-0000-000000000000";
-  
+  const url = new URL(request.url);
+  const farmName = url.searchParams.get("farm_name") ?? "Farm";
+
   // Available seasons for Tamil Nadu
   const seasons = ["Kharif", "Rabi", "Summer", "Kar", "Samba", "Thaladi"];
-  
-  return json<LoaderData>({ farmId, seasons });
+
+  return json<LoaderData>({ farmId, farmName, seasons });
 }
 
 export async function action({ request, params }: ActionFunctionArgs) {
@@ -93,7 +96,8 @@ export async function action({ request, params }: ActionFunctionArgs) {
 }
 
 export default function FarmRecommendations() {
-  const { farmId, seasons } = useLoaderData<typeof loader>();
+  const { farmId, farmName, seasons } = useLoaderData<typeof loader>();
+  const [searchParams] = useSearchParams();
   const fetcher = useFetcher<RecommendationResponse>();
   const [selectedSeason, setSelectedSeason] = useState<string>("Samba");
   const [recommendations, setRecommendations] = useState<CropRecommendation[] | null>(null);
@@ -113,7 +117,44 @@ export default function FarmRecommendations() {
   const error = fetcher.data?.success === false ? fetcher.data.error : null;
 
   return (
-    <div className="min-h-screen bg-gray-50 p-4 md:p-8">
+    <div className="min-h-screen bg-gray-50">
+      {/* Nav bar */}
+      <nav className="bg-white shadow-sm sticky top-0 z-10">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Link to="/" className="text-green-600 hover:text-green-700 text-sm">
+                ← Home
+              </Link>
+              <span className="text-gray-300">/</span>
+              <Link
+                to={`/farm/${farmId}/snapshot?${searchParams.toString()}`}
+                className="text-green-600 hover:text-green-700 text-sm"
+              >
+                ← Snapshot
+              </Link>
+              <span className="text-gray-300">/</span>
+              <span className="text-gray-800 font-semibold text-sm">{farmName} — Crop Recs</span>
+            </div>
+            <div className="flex items-center gap-3">
+              <Link
+                to={`/farm/${farmId}/snapshot?${searchParams.toString()}`}
+                className="text-sm text-blue-600 hover:text-blue-700"
+              >
+                📸 Snapshot
+              </Link>
+              <Link
+                to={`/farm/${farmId}/irrigation?${searchParams.toString()}`}
+                className="text-sm text-blue-600 hover:text-blue-700"
+              >
+                💧 Irrigation
+              </Link>
+            </div>
+          </div>
+        </div>
+      </nav>
+
+      <div className="p-4 md:p-8">
       <div className="max-w-6xl mx-auto">
         {/* Header */}
         <div className="mb-8">
@@ -239,6 +280,7 @@ export default function FarmRecommendations() {
             </p>
           </Card>
         )}
+      </div>
       </div>
     </div>
   );

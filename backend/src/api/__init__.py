@@ -6,6 +6,7 @@ from fastapi import APIRouter
 api_router = APIRouter(prefix="/api/v1")
 
 # Import route modules
+from .routes.farm import router as farm_router
 from .routes.recommendations import router as recommendations_router
 from .routes.irrigation import router as irrigation_router
 
@@ -15,6 +16,7 @@ from .routes.irrigation import router as irrigation_router
 # from .routes.subsidies import router as subsidies_router
 
 # Register route modules
+api_router.include_router(farm_router, prefix="/farm", tags=["farm"])
 api_router.include_router(recommendations_router, prefix="/farm", tags=["recommendations"])
 api_router.include_router(irrigation_router, prefix="", tags=["irrigation"])
 
