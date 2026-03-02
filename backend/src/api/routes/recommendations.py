@@ -11,6 +11,7 @@ from pydantic import BaseModel, Field
 from ...models.recommendation import Recommendation
 from ...services.recommendations.crop_recommender import CropRecommender
 from ...services.recommendations.recommendation_cache import RecommendationCache
+from ...services.recommendations.recommendation_repository import RecommendationRepository
 from ...services.snapshot.snapshot_generator import SnapshotGenerator
 
 logger = logging.getLogger(__name__)
@@ -20,6 +21,7 @@ router = APIRouter(prefix="", tags=["recommendations"])
 # Service instances (would be dependency-injected in production)
 crop_recommender = CropRecommender()
 recommendation_cache = RecommendationCache()
+recommendation_repo = RecommendationRepository()
 snapshot_generator = SnapshotGenerator()
 
 
@@ -115,6 +117,30 @@ async def generate_crop_recommendations(request: RecommendationRequest):
                 detail=f"Failed to generate recommendations: {result.get('error')}"
             )
         
+        # Persist to Supabase
+        confidence_pct = int(result.get("confidence", 0.0) * 100)
+        sources = [
+            {"source_name": tc.get("tool", "unknown"), "data_age_hours": 0, "confidence_contribution_pct": 0}
+            for tc in result.get("tool_calls", [])
+        ]
+        if not sources:
+            sources = [{"source_name": "crop_knowledge", "data_age_hours": 0, "confidence_contribution_pct": 100}]
+
+        saved = recommendation_repo.save(
+            farm_id=request.farm_id,
+            rec_type="crop",
+            payload=result,
+            confidence=confidence_pct,
+            sources=sources,
+            explanation=result.get("explanation", "")[:2000],
+            model_version="crop-recommender-v1",
+            tool_calls=result.get("tool_calls", []),
+            ttl_hours=48,
+        )
+
+        if saved:
+            result["recommendation_id"] = saved.get("id")
+
         # Cache result
         recommendation_cache.cache_recommendation(
             request.farm_id,
@@ -134,6 +160,7 @@ async def generate_crop_recommendations(request: RecommendationRequest):
                 "response_time_ms": round(elapsed_ms, 2),
                 "timestamp": datetime.utcnow().isoformat(),
                 "confidence": result.get("confidence", 0.0),
+                "recommendation_id": saved.get("id") if saved else None,
             }
         )
         
@@ -167,16 +194,34 @@ async def get_farm_recommendations(
         List of past recommendations
     """
     try:
-        # Mock response for MVP - in production, query database
-        # This would use SQLAlchemy to query Recommendation model
-        
+        # Fetch from Supabase
+        if status == "active":
+            rows = recommendation_repo.get_active_for_farm(
+                farm_id=farm_id,
+                rec_type="crop",
+                limit=limit,
+            )
+        else:
+            rows = recommendation_repo.get_history(
+                farm_id=farm_id,
+                rec_type="crop",
+                season=season,
+                limit=limit,
+            )
+
+        # Optionally filter history by season
+        if season and rows:
+            rows = [
+                r for r in rows
+                if r.get("payload", {}).get("season", "").lower() == season.lower()
+            ]
+
         return RecommendationResponse(
             success=True,
             data={
                 "farm_id": str(farm_id),
-                "recommendations": [],
-                "total": 0,
-                "message": "Historical recommendations retrieval not yet implemented in MVP"
+                "recommendations": rows,
+                "total": len(rows),
             },
             metadata={
                 "timestamp": datetime.utcnow().isoformat(),
@@ -184,10 +229,10 @@ async def get_farm_recommendations(
                     "season": season,
                     "status": status,
                     "limit": limit,
-                }
+                },
             }
         )
-        
+
     except Exception as e:
         logger.error(f"Error retrieving recommendations: {str(e)}")
         raise HTTPException(

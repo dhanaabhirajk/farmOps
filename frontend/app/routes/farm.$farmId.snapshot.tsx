@@ -8,13 +8,14 @@
  * Pre-seeded farms: uses farmId UUID to identify the farm.
  */
 
-import type { LoaderFunctionArgs, MetaFunction } from "@remix-run/node";
+import type { LoaderFunctionArgs, MetaFunction, ShouldRevalidateFunctionArgs } from "@remix-run/node";
 import { json } from "@remix-run/node";
 import {
   Link,
   useLoaderData,
   useNavigation,
   useRevalidator,
+  useRouteLoaderData,
   useSearchParams,
 } from "@remix-run/react";
 import { useEffect, useState } from "react";
@@ -22,6 +23,25 @@ import { FarmSnapshotCard } from "~/components/FarmSnapshotCard";
 import type { SnapshotData } from "~/components/FarmSnapshotCard";
 import { Spinner } from "~/components/ui/Spinner";
 import { Button } from "~/components/ui/Button";
+
+// Don't re-run the snapshot loader when the user just tabs between pages within
+// the same farm — reuse the already-loaded data.  Only re-fetch when:
+//   • A different farm is selected (farmId changes), or
+//   • The user explicitly hits Refresh (use_cache=false).
+export function shouldRevalidate({
+  currentUrl,
+  nextUrl,
+  defaultShouldRevalidate,
+}: ShouldRevalidateFunctionArgs) {
+  const currentFarmId = currentUrl.pathname.match(/\/farm\/([^/]+)/)?.[1];
+  const nextFarmId = nextUrl.pathname.match(/\/farm\/([^/]+)/)?.[1];
+  const forceRefresh = nextUrl.searchParams.get("use_cache") === "false";
+
+  if (nextFarmId && currentFarmId === nextFarmId && !forceRefresh) {
+    return false; // same farm, just switching tabs — keep cached data
+  }
+  return defaultShouldRevalidate;
+}
 
 export const meta: MetaFunction<typeof loader> = ({ data }) => {
   const name = data?.farmName ?? "Farm Snapshot";
@@ -65,6 +85,7 @@ export async function loader({ params, request }: LoaderFunctionArgs) {
   try {
     const queryParams = new URLSearchParams({
       farm_id: farmId,
+      farm_name: farmName,
       lat: lat.toString(),
       lon: lon.toString(),
       district,
@@ -255,10 +276,32 @@ function normaliseSnapshot(
 
 export default function FarmSnapshotPage() {
   const data = useLoaderData<typeof loader>();
+  const parentData = useRouteLoaderData("routes/farm.$farmId") as
+    | { farmName: string | null }
+    | undefined;
   const navigation = useNavigation();
   const revalidator = useRevalidator();
   const [searchParams] = useSearchParams();
   const isLoading = navigation.state === "loading" || revalidator.state === "loading";
+
+  // ── Strip use_cache=false from the URL after a successful load ────────────
+  // This ensures repeat visits (bookmarks, tabs, sharing the URL) don't
+  // re-trigger LLM calls. use_cache=false is only meant as a one-shot
+  // "force refresh" signal — once the snapshot is generated and cached,
+  // future visits should get the fast path.
+  useEffect(() => {
+    if (isLoading || !data.snapshot) return;
+
+    const current = new URL(window.location.href);
+    if (current.searchParams.get("use_cache") === "false") {
+      current.searchParams.delete("use_cache");
+      window.history.replaceState(null, "", current.toString());
+    }
+  }, [isLoading, data.snapshot]);
+
+  // Prefer the parent layout's farm name (comes from URL params on first entry
+  // and never loses it on tab switches), falling back to the snapshot loader's value.
+  const displayFarmName = parentData?.farmName || data.farmName;
 
   // Show a countdown while fetching cold data (LLM can take up to 8s)
   const [elapsed, setElapsed] = useState(0);
@@ -343,7 +386,7 @@ export default function FarmSnapshotPage() {
                 ← Home
               </Link>
               <span className="text-gray-300">/</span>
-              <span className="text-gray-800 font-semibold text-sm">{data.farmName}</span>
+              <span className="text-gray-800 font-semibold text-sm">{displayFarmName}</span>
             </div>
             <div className="flex items-center gap-3">
               <Link
@@ -351,12 +394,6 @@ export default function FarmSnapshotPage() {
                 className="text-sm text-blue-600 hover:text-blue-700"
               >
                 🌱 Crop Recs
-              </Link>
-              <Link
-                to={`/farm/${data.farmId}/irrigation?${searchParams.toString()}`}
-                className="text-sm text-blue-600 hover:text-blue-700"
-              >
-                💧 Irrigation
               </Link>
               <Link
                 to={`/farm/${data.farmId}/harvest?${searchParams.toString()}`}

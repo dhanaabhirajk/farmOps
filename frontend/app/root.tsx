@@ -17,6 +17,7 @@ export const links: LinksFunction = () => [
 
 export const meta: MetaFunction = () => {
   return [
+    { charSet: "utf-8" },
     { title: "FarmOps - Location-Based Insights for Tamil Nadu Farmers" },
     {
       name: "description",
@@ -31,9 +32,8 @@ export default function App() {
   const isNavigating = navigation.state === "loading";
 
   return (
-    <html lang="ta">
-      <head>
-        <meta charSet="utf-8" />
+    <html lang="ta" suppressHydrationWarning>
+      <head suppressHydrationWarning>
         <Meta />
         <Links />
       </head>
@@ -56,8 +56,8 @@ export function ErrorBoundary() {
   const error = useRouteError();
 
   return (
-    <html lang="ta">
-      <head>
+    <html lang="ta" suppressHydrationWarning>
+      <head suppressHydrationWarning>
         <title>Error - FarmOps</title>
         <Meta />
         <Links />

@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
 import { FarmState, Crop, FarmLocation, UserSettings, Farm, InventoryItem } from '~/types';
 
 interface FarmStore extends FarmState {
@@ -7,6 +8,7 @@ interface FarmStore extends FarmState {
   // Farm Management
   setFarms: (farms: Farm[]) => void; // New: Initialize from backend
   addFarm: (farm: Farm) => void;
+  removeFarm: (id: string) => void;
   selectFarm: (id: string) => void;
   updateFarm: (id: string, updates: Partial<Farm>) => void;
   
@@ -26,12 +28,14 @@ interface FarmStore extends FarmState {
   removeInventoryItem: (id: string) => void;
 }
 
-export const useFarmStore = create<FarmStore>((set, get) => ({
-  farms: [], // Start empty, will be hydrated by Remix loader
+export const useFarmStore = create<FarmStore>()(
+  persist(
+    (set, get) => ({
+  farms: [],
   selectedFarmId: null,
   settings: {
     language: 'en',
-    currency: 'INR', // Changed from USD to INR for Tamil Nadu context
+    currency: 'INR',
     unit: 'metric',
   },
   
@@ -44,6 +48,11 @@ export const useFarmStore = create<FarmStore>((set, get) => ({
     selectedFarmId: farm.id 
   })),
   
+  removeFarm: (id) => set((state) => ({
+    farms: state.farms.filter((f) => f.id !== id),
+    selectedFarmId: state.selectedFarmId === id ? null : state.selectedFarmId,
+  })),
+
   selectFarm: (id) => set({ selectedFarmId: id }),
   
   updateFarm: (id, updates) => set((state) => ({
@@ -139,4 +148,7 @@ export const useFarmStore = create<FarmStore>((set, get) => ({
       )
     };
   }),
-}));
+}),
+  { name: 'farmops-store' }
+  )
+);

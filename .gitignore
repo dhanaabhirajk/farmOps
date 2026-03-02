@@ -45,3 +45,4 @@ keys/*
 
 # Sample UI reference (not part of the project)
 new_sample_ui/
+backend/snapshot_store/

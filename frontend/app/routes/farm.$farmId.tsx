@@ -5,9 +5,10 @@ import {
   useLocation, 
   useNavigate, 
   NavLink,
-  Link
+  Link,
+  useSearchParams
 } from "@remix-run/react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { 
   TrendingUp, 
   Sprout, 
@@ -24,39 +25,27 @@ import {
 } from "lucide-react";
 import { cn } from "~/lib/utils";
 import { useFarmStore } from "~/store/useFarmStore";
-import { fetchFarmSnapshot } from "~/utils/api";
 
 // This layout replaces the Dashboard component from the new UI
 // It provides the Sidebar and Header, and renders child routes (tabs) via Outlet
 
-export async function loader({ params }: LoaderFunctionArgs) {
+export async function loader({ params, request }: LoaderFunctionArgs) {
   const farmId = params.farmId;
   if (!farmId) throw new Error("Farm ID is required");
 
-  // Fetch real data from the API
-  // In a real implementation, we would probably fetch the list of farms here too
-  // for the switcher. For now, we'll mock the list but fetch the current farm details.
-  
-  try {
-    const snapshot = await fetchFarmSnapshot(farmId);
-    return json({ 
-      farmData: snapshot.data, 
-      farmId,
-      error: null 
-    });
-  } catch (error) {
-    console.error("Failed to fetch farm data", error);
-    // Return mock fallback or error state if API fails (for development robustness)
-    return json({ 
-      farmData: null, 
-      farmId,
-      error: "Failed to load farm data" 
-    });
-  }
+  const url = new URL(request.url);
+  const farmName = url.searchParams.get("farm_name") ?? null;
+  const district  = url.searchParams.get("district")  ?? null;
+  const mainCrop  = url.searchParams.get("main_crop") ?? null;
+  const areaAcres = parseFloat(url.searchParams.get("area_acres") ?? "0") || null;
+  const lat       = parseFloat(url.searchParams.get("lat") ?? "0") || null;
+  const lon       = parseFloat(url.searchParams.get("lon") ?? "0") || null;
+
+  return json({ farmId, farmName, district, mainCrop, areaAcres, lat, lon, error: null });
 }
 
 export default function FarmDashboardLayout() {
-  const { farmData, farmId, error } = useLoaderData<typeof loader>();
+  const { farmId, farmName, district, mainCrop, areaAcres, lat, lon, error } = useLoaderData<typeof loader>();
   const location = useLocation();
   const navigate = useNavigate();
   
@@ -64,51 +53,58 @@ export default function FarmDashboardLayout() {
     farms, 
     selectedFarmId, 
     selectFarm, 
-    setFarms, 
     addFarm 
   } = useFarmStore();
   
   const [isFarmMenuOpen, setIsFarmMenuOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const initialized = useRef(false);
 
-  // Initialize store with loaded data
+  // Add this farm to the store once, using URL params for the real name
   useEffect(() => {
-    if (farmData) {
-      // If we have data, ensure it's in the store
-      // Logic to merge or set farm data in Zustand
-      // For now, we'll just ensure the farm exists in the list
-      const existing = farms.find(f => f.id === farmId);
-      if (!existing) {
-        addFarm({
-            id: farmId || 'unknown',
-            name: farmData.name || 'My Farm',
-            location: {
-                lat: farmData.centroid?.coordinates[1],
-                lng: farmData.centroid?.coordinates[0],
-                city: farmData.district
-            },
-            totalAcres: farmData.area_acres || 0,
-            crops: [], // Would need to fetch these too
-            inventory: []
-        });
-      }
-      selectFarm(farmId || '');
+    if (initialized.current) return;
+    initialized.current = true;
+
+    const existing = useFarmStore.getState().farms.find(f => f.id === farmId);
+    if (!existing) {
+      addFarm({
+        id: farmId || 'unknown',
+        name: farmName || (district ? `${district} Farm` : 'My Farm'),
+        location: {
+          lat: lat ?? 0,
+          lng: lon ?? 0,
+          city: district ?? 'Unknown',
+        },
+        totalAcres: areaAcres ?? 0,
+        crops: [],
+        inventory: [],
+      });
     }
-  }, [farmData, farmId, addFarm, selectFarm, farms]);
+    selectFarm(farmId || '');
+  }, [farmId]); // only run when farmId changes
 
   const selectedFarm = farms.find(f => f.id === (selectedFarmId || farmId));
-  const activeSegment = location.pathname.split("/").pop(); // 'snapshot', 'planning', etc.
+  const activeSegment = location.pathname.split("/").pop();
+  const [searchParams] = useSearchParams();
+
+  // Build a query string that preserves farm identity params across tab switches.
+  // Strips use_cache=false so navigating tabs never forces an LLM re-run.
+  const farmParams = (() => {
+    const p = new URLSearchParams(searchParams);
+    p.delete("use_cache");
+    const qs = p.toString();
+    return qs ? `?${qs}` : "";
+  })();
 
   return (
     <div className="min-h-screen bg-cream pb-20 md:pb-0 md:pl-20">
       {/* Mobile Nav */}
       <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 p-2 flex justify-around md:hidden z-50">
-        <NavButton to="snapshot" icon={TrendingUp} label="Snapshot" active={activeSegment === 'snapshot'} />
-        <NavButton to="planning" icon={Sprout} label="Crops" active={activeSegment === 'planning'} />
-        <NavButton to="inventory" icon={Package} label="Stock" active={activeSegment === 'inventory'} />
-        <NavButton to="irrigation" icon={Droplets} label="Water" active={activeSegment === 'irrigation'} />
-        <NavButton to="schemes" icon={IndianRupee} label="Schemes" active={activeSegment === 'schemes'} />
-        <NavButton to="settings" icon={Settings} label="Settings" active={false} onClick={() => setIsSettingsOpen(true)} />
+        <NavButton to="snapshot" farmParams={farmParams} icon={TrendingUp} label="Snapshot" active={activeSegment === 'snapshot'} />
+        <NavButton to="planning" farmParams={farmParams} icon={Sprout} label="Crops" active={activeSegment === 'planning'} />
+        <NavButton to="inventory" farmParams={farmParams} icon={Package} label="Stock" active={activeSegment === 'inventory'} />
+        <NavButton to="schemes" farmParams={farmParams} icon={IndianRupee} label="Schemes" active={activeSegment === 'schemes'} />
+        <NavButton to="settings" farmParams={farmParams} icon={Settings} label="Settings" active={false} onClick={() => setIsSettingsOpen(true)} />
       </div>
 
       {/* Desktop Nav */}
@@ -117,11 +113,10 @@ export default function FarmDashboardLayout() {
           <Leaf className="w-6 h-6" />
         </Link>
         <div className="flex flex-col gap-4 w-full">
-          <NavButton to="snapshot" icon={TrendingUp} label="Snapshot" active={activeSegment === 'snapshot'} desktop />
-          <NavButton to="planning" icon={Sprout} label="Crops" active={activeSegment === 'planning'} desktop />
-          <NavButton to="inventory" icon={Package} label="Stock" active={activeSegment === 'inventory'} desktop />
-          <NavButton to="irrigation" icon={Droplets} label="Water" active={activeSegment === 'irrigation'} desktop />
-          <NavButton to="schemes" icon={IndianRupee} label="Schemes" active={activeSegment === 'schemes'} desktop />
+          <NavButton to="snapshot" farmParams={farmParams} icon={TrendingUp} label="Snapshot" active={activeSegment === 'snapshot'} desktop />
+          <NavButton to="planning" farmParams={farmParams} icon={Sprout} label="Crops" active={activeSegment === 'planning'} desktop />
+          <NavButton to="inventory" farmParams={farmParams} icon={Package} label="Stock" active={activeSegment === 'inventory'} desktop />
+          <NavButton to="schemes" farmParams={farmParams} icon={IndianRupee} label="Schemes" active={activeSegment === 'schemes'} desktop />
           <div className="mt-auto">
             <button 
               onClick={() => setIsSettingsOpen(true)}
@@ -141,7 +136,7 @@ export default function FarmDashboardLayout() {
                 onClick={() => setIsFarmMenuOpen(!isFarmMenuOpen)}
                 className="flex items-center gap-2 text-2xl font-serif font-bold text-gray-900 hover:text-farm-green transition-colors"
               >
-                {selectedFarm?.name || farmData?.name || 'My Farm'}
+                {selectedFarm?.name || farmName || 'My Farm'}
                 <ChevronDown className="w-5 h-5 text-gray-400" />
               </button>
               
@@ -155,7 +150,8 @@ export default function FarmDashboardLayout() {
                         onClick={() => {
                           selectFarm(farm.id);
                           setIsFarmMenuOpen(false);
-                          navigate(`/farm/${farm.id}/snapshot`);
+                          // Keep the same tab but switch farm, preserving search params
+                          navigate(`/farm/${farm.id}/${activeSegment ?? 'snapshot'}${farmParams}`);
                         }}
                         className={cn(
                           "w-full text-left px-3 py-2 rounded-xl text-sm font-medium transition-colors flex items-center justify-between",
@@ -168,12 +164,14 @@ export default function FarmDashboardLayout() {
                     ))}
                     <div className="h-px bg-gray-100 my-2" />
                     <button
+                      onClick={() => { setIsFarmMenuOpen(false); navigate(`/sketch?farm_id=${farmId}`); }}
                       className="w-full text-left px-3 py-2 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-2"
                     >
                       <Pencil className="w-4 h-4" />
                       Redraw Layout
                     </button>
                     <button
+                      onClick={() => { setIsFarmMenuOpen(false); navigate('/'); }}
                       className="w-full text-left px-3 py-2 rounded-xl text-sm font-medium text-farm-green hover:bg-farm-green/5 transition-colors flex items-center gap-2"
                     >
                       <PlusCircle className="w-4 h-4" />
@@ -184,7 +182,7 @@ export default function FarmDashboardLayout() {
               )}
             </div>
             <p className="text-sm text-gray-500 flex items-center gap-1 mt-1">
-              <MapPin className="w-3 h-3" /> {selectedFarm?.location?.city || farmData?.district || 'Unknown Location'}
+              <MapPin className="w-3 h-3" /> {selectedFarm?.location?.city || district || 'Unknown Location'}
             </p>
           </div>
           <button 
@@ -195,13 +193,7 @@ export default function FarmDashboardLayout() {
           </button>
         </header>
 
-        {error ? (
-           <div className="bg-red-50 p-4 rounded-xl text-red-500">
-             Error: {error}. Is the backend running?
-           </div>
-        ) : (
-           <Outlet context={{ farmData }} />
-        )}
+        <Outlet context={{ farmId, farmName, district, mainCrop, areaAcres, lat, lon }} />
       </main>
 
       {/* Settings Modal would go here */}
@@ -209,7 +201,7 @@ export default function FarmDashboardLayout() {
   );
 }
 
-function NavButton({ to, icon: Icon, label, active, desktop, onClick }: any) {
+function NavButton({ to, farmParams = "", icon: Icon, label, active, desktop, onClick }: any) {
   if (onClick) {
      return (
         <button
@@ -227,7 +219,7 @@ function NavButton({ to, icon: Icon, label, active, desktop, onClick }: any) {
   }
   return (
     <NavLink
-      to={to}
+      to={`${to}${farmParams}`}
       className={({ isActive }) => cn(
         "flex flex-col items-center justify-center gap-1 p-2 rounded-xl transition-all",
         isActive ? "text-farm-green bg-farm-green/5" : "text-gray-400 hover:text-gray-600",

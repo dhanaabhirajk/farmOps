@@ -1,264 +1,192 @@
 import type { MetaFunction } from "@remix-run/node";
-import { useNavigate, useNavigation } from "@remix-run/react";
+import { useNavigate } from "@remix-run/react";
 import { useEffect, useState } from "react";
-import { FarmSelector } from "~/components/FarmSelector";
-import type { FarmLocation } from "~/components/FarmSelector";
+import { motion } from "framer-motion";
+import {
+  Leaf,
+  PlusCircle,
+  ChevronRight,
+  TrendingUp,
+  Sprout,
+  Droplets,
+  IndianRupee,
+  MapPin,
+  Trash2,
+} from "lucide-react";
+import { useFarmStore } from "~/store/useFarmStore";
 
-export const meta: MetaFunction = () => {
-  return [
-    { title: "FarmOps - AI Agricultural Insights for Tamil Nadu Farmers" },
-    {
-      name: "description",
-      content: "Select or draw your farm on the map to get instant AI-powered crop snapshots, recommendations, and irrigation schedules.",
-    },
-  ];
-};
-
-const FEATURES = [
-  {
-    emoji: "📸",
-    title: "Farm Snapshot",
-    desc: "Instant soil, weather, NDVI, and mandi price analysis for your exact location",
-    href: "snapshot",
-    color: "from-green-400 to-emerald-500",
-  },
-  {
-    emoji: "🌱",
-    title: "Crop Recommendations",
-    desc: "AI-ranked crop suggestions with yield, profit, and risk scores for this season",
-    href: "recommendations",
-    color: "from-lime-400 to-green-500",
-  },
-  {
-    emoji: "💧",
-    title: "Irrigation Scheduling",
-    desc: "14-day smart irrigation calendar based on soil moisture and weather forecast",
-    href: "irrigation",
-    color: "from-blue-400 to-cyan-500",
-  },
-  {
-    emoji: "🚜",
-    title: "Harvest Timing",
-    desc: "Optimal harvest window and sell-vs-store decision based on price forecasts",
-    href: "harvest",
-    color: "from-amber-400 to-orange-500",
-  },
-  {
-    emoji: "📋",
-    title: "Subsidy Match",
-    desc: "Check your farm's eligibility for Tamil Nadu government schemes and programmes",
-    href: "subsidies",
-    color: "from-purple-400 to-violet-500",
-  },
+export const meta: MetaFunction = () => [
+  { title: "FarmOps — AI Insights for Tamil Nadu Farmers" },
+  { name: "description", content: "AI-powered crop insights for Tamil Nadu farmers." },
 ];
 
 export default function Home() {
   const navigate = useNavigate();
-  const navigation = useNavigation();
-  const isNavigating = navigation.state === "loading";
+  const [farms, setFarms] = useState<ReturnType<typeof useFarmStore.getState>["farms"]>([]);
 
-  // Tick elapsed seconds while navigating so user sees progress
-  const [elapsed, setElapsed] = useState(0);
+  // SSR-safe hydration — only read localStorage on client
   useEffect(() => {
-    if (!isNavigating) { setElapsed(0); return; }
-    const t = setInterval(() => setElapsed((s) => s + 1), 1000);
-    return () => clearInterval(t);
-  }, [isNavigating]);
+    setFarms(useFarmStore.getState().farms);
+    return useFarmStore.subscribe((s) => setFarms([...s.farms]));
+  }, []);
 
-  const handleFarmSelected = (farm: FarmLocation) => {
-    // Build query params so the snapshot page knows the location
-    const params = new URLSearchParams({
-      lat: farm.lat.toString(),
-      lon: farm.lon.toString(),
-      district: farm.district,
-      main_crop: farm.main_crop,
-      area_acres: farm.area_acres.toString(),
-      farm_name: farm.farm_name,
-    });
-    navigate(`/farm/${farm.farm_id}/snapshot?${params.toString()}`);
+  const removeFarm = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    useFarmStore.getState().removeFarm?.(id);
   };
 
+  const openFarm = (f: (typeof farms)[0]) =>
+    navigate(
+      `/farm/${f.id}/snapshot?farm_name=${encodeURIComponent(f.name)}&area_acres=${f.totalAcres ?? 0}&district=${encodeURIComponent(f.location?.city ?? "Unknown")}&lat=${f.location?.lat ?? 0}&lon=${f.location?.lng ?? 0}`
+    );
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-green-50 via-white to-blue-50">
-      {/* ── Navigation loading overlay ───────────────────────────────── */}
-      {isNavigating && (
-        <div className="fixed inset-0 z-50 bg-white/80 backdrop-blur-sm flex flex-col items-center justify-center gap-4">
-          <div className="flex flex-col items-center gap-4 bg-white rounded-2xl shadow-xl border border-green-100 p-8 max-w-sm w-full mx-4">
-            <div className="flex gap-2 text-3xl animate-bounce">
-              <span>🌾</span>
+    <div className="min-h-screen bg-cream font-sans text-gray-900 flex flex-col">
+      {/* ── Navbar */}
+      <nav className="bg-white/80 backdrop-blur-sm border-b border-gray-100 sticky top-0 z-20">
+        <div className="max-w-2xl mx-auto px-5 sm:px-8 py-3.5 flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 bg-farm-green rounded-lg flex items-center justify-center">
+              <Leaf className="w-4 h-4 text-white" />
             </div>
-            <h2 className="text-xl font-bold text-gray-900 text-center">Analysing Your Farm…</h2>
-            <p className="text-sm text-gray-500 text-center">
-              {elapsed < 3
-                ? "Connecting to live data sources…"
-                : elapsed < 6
-                ? "Fetching weather, soil & NDVI…"
-                : elapsed < 9
-                ? "Running AI analysis with Mistral…"
-                : "Compiling insights for your farm…"}
-            </p>
-            {/* Progress bar */}
-            <div className="w-full bg-gray-100 rounded-full h-2">
-              <div
-                className="bg-green-500 h-2 rounded-full transition-all duration-1000"
-                style={{ width: `${Math.min(elapsed * 8, 90)}%` }}
-              />
-            </div>
-            <p className="text-xs text-gray-400">{elapsed}s elapsed · cold fetch up to 15s</p>
-            <div className="flex gap-3 text-sm text-gray-400">
-              <span>🌤 Weather</span>
-              <span>🛰 NDVI</span>
-              <span>🏪 Mandi</span>
-              <span>🌱 Soil</span>
-            </div>
+            <span className="font-serif text-xl font-bold text-farm-green">FarmOps</span>
           </div>
-        </div>
-      )}
-      {/* ── Nav ─────────────────────────────────────────────────────────── */}
-      <nav className="bg-white/80 backdrop-blur-sm shadow-sm sticky top-0 z-20">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <span className="text-2xl">🌾</span>
-            <span className="text-xl font-bold text-green-700">FarmOps</span>
-          </div>
-          <p className="text-gray-500 text-sm hidden sm:block">
-            Location-Based Insights Engine · Tamil Nadu
-          </p>
+          <span className="text-xs text-gray-400 hidden sm:block tracking-wide uppercase">
+            Mistral AI · Tamil Nadu
+          </span>
         </div>
       </nav>
 
-      {/* ── Hero + Farm Selector ─────────────────────────────────────────── */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <div className="grid lg:grid-cols-2 gap-10 items-start">
-          {/* Left — headline */}
-          <div className="lg:sticky lg:top-24">
-            <span className="inline-block px-3 py-1 text-xs font-semibold text-green-700 bg-green-100 rounded-full mb-4">
-              🤖 Powered by Mistral AI
-            </span>
-            <h1 className="text-4xl sm:text-5xl font-extrabold text-gray-900 leading-tight mb-4">
-              AI-Powered<br />
-              <span className="text-green-600">Agricultural</span> Insights
-            </h1>
-            <p className="text-lg text-gray-600 mb-6">
-              Select your farm on the map — or draw its boundary — to instantly get soil
-              analysis, weather, satellite NDVI, live mandi prices, and an AI-generated
-              priority action tailored to your land.
+      <div className="flex-1 max-w-2xl mx-auto w-full px-5 sm:px-8 pt-12 pb-16">
+        {/* Hero */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.45 }}
+          className="mb-10"
+        >
+          <h1 className="font-serif text-4xl sm:text-5xl font-bold text-gray-900 leading-tight mb-3">
+            Farm insights,<br />
+            <span className="text-farm-green">rooted in data.</span>
+          </h1>
+          <p className="text-gray-500 leading-relaxed max-w-md">
+            Get live soil analysis, mandi prices, satellite NDVI and AI recommendations —
+            specific to your land.
+          </p>
+        </motion.div>
+
+        {/* ── My Farms list */}
+        {farms.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.4, delay: 0.05 }}
+            className="mb-8"
+          >
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">
+              My Farms
             </p>
-
-            {/* Feature pills */}
-            <div className="flex flex-wrap gap-2 mb-8">
-              {["📸 Farm Snapshot", "🌱 Crop Recs", "💧 Irrigation", "🚜 Harvest", "📋 Subsidies"].map((f) => (
-                <span key={f} className="px-3 py-1 bg-white border border-gray-200 rounded-full text-sm text-gray-600 shadow-sm">
-                  {f}
-                </span>
+            <div className="space-y-2.5">
+              {farms.map((f, i) => (
+                <motion.button
+                  key={f.id}
+                  initial={{ opacity: 0, x: -12 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: i * 0.06 }}
+                  onClick={() => openFarm(f)}
+                  className="w-full flex items-center justify-between bg-white rounded-2xl border border-gray-100 px-5 py-4 shadow-sm hover:shadow-md hover:border-farm-green/30 hover:-translate-y-0.5 transition-all group text-left"
+                >
+                  <div className="flex items-center gap-4">
+                    <div className="w-10 h-10 bg-farm-green/10 rounded-xl flex items-center justify-center shrink-0">
+                      <Sprout className="w-5 h-5 text-farm-green" />
+                    </div>
+                    <div>
+                      <p className="font-semibold text-gray-900 group-hover:text-farm-green transition-colors">
+                        {f.name}
+                      </p>
+                      <p className="text-xs text-gray-400 mt-0.5 flex items-center gap-1">
+                        {f.location?.city && (
+                          <><MapPin className="w-3 h-3" />{f.location.city} · </>
+                        )}
+                        {f.totalAcres ? `${f.totalAcres} acres` : "Area not set"}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={(e) => removeFarm(f.id, e)}
+                      className="p-1.5 rounded-lg text-gray-300 hover:text-red-400 hover:bg-red-50 transition-all opacity-0 group-hover:opacity-100"
+                      title="Remove farm"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                    <ChevronRight className="w-5 h-5 text-gray-300 group-hover:text-farm-green transition-colors" />
+                  </div>
+                </motion.button>
               ))}
             </div>
+          </motion.div>
+        )}
 
-            {/* Stats row */}
-            <div className="grid grid-cols-3 gap-4 text-center">
-              {[
-                { value: "<8s", label: "Cold response" },
-                { value: "<300ms", label: "Cached" },
-                { value: "5 insights", label: "Per snapshot" },
-              ].map(({ value, label }) => (
-                <div key={label} className="bg-white rounded-xl shadow-sm p-3 border border-gray-100">
-                  <div className="text-xl font-bold text-green-600">{value}</div>
-                  <div className="text-xs text-gray-500">{label}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Right — Farm Selector card */}
-          <div className="bg-white rounded-2xl shadow-xl border border-gray-100 p-6">
-            <div className="mb-5">
-              <h2 className="text-xl font-bold text-gray-900">📍 Select Your Farm</h2>
-              <p className="text-sm text-gray-500 mt-0.5">
-                Choose a test farm, enter coordinates, or draw your farm boundary on the map.
-              </p>
-            </div>
-            <FarmSelector onFarmSelected={handleFarmSelected} />
-          </div>
-        </div>
-      </section>
-
-      {/* ── Features grid ───────────────────────────────────────────────── */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <h2 className="text-2xl font-bold text-gray-900 mb-6 text-center">
-          What You Get After Selecting Your Farm
-        </h2>
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
-          {FEATURES.map(({ emoji, title, desc, color }) => (
-            <div
-              key={title}
-              className="bg-white rounded-xl border border-gray-100 shadow-sm p-5 hover:shadow-md transition-shadow"
-            >
-              <div className={`inline-flex items-center justify-center w-10 h-10 rounded-lg bg-gradient-to-br ${color} text-white text-xl mb-3`}>
-                {emoji}
+        {/* ── Create New Farm CTA */}
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, delay: 0.1 }}
+        >
+          <button
+            onClick={() => navigate("/sketch")}
+            className="w-full flex items-center justify-between bg-farm-green text-white rounded-2xl px-6 py-5 shadow-lg shadow-farm-green/20 hover:bg-green-800 active:scale-[0.98] transition-all group"
+          >
+            <div className="flex items-center gap-4">
+              <div className="w-10 h-10 bg-white/15 rounded-xl flex items-center justify-center">
+                <PlusCircle className="w-5 h-5" />
               </div>
-              <h3 className="font-semibold text-gray-900 mb-1">{title}</h3>
-              <p className="text-sm text-gray-500">{desc}</p>
+              <div className="text-left">
+                <p className="font-semibold text-base">Create New Farm</p>
+                <p className="text-white/70 text-xs mt-0.5">Draw boundary → set location → analyse</p>
+              </div>
+            </div>
+            <ChevronRight className="w-5 h-5 text-white/60 group-hover:translate-x-1 transition-transform" />
+          </button>
+        </motion.div>
+
+        {/* ── Feature pills */}
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.5, delay: 0.2 }}
+          className="mt-10 grid grid-cols-2 sm:grid-cols-4 gap-3"
+        >
+          {[
+            { icon: TrendingUp, label: "NDVI Snapshot" },
+            { icon: Sprout,     label: "Crop Recs" },
+            { icon: Droplets,   label: "Irrigation" },
+            { icon: IndianRupee, label: "Mandi Prices" },
+          ].map(({ icon: Icon, label }) => (
+            <div
+              key={label}
+              className="bg-white rounded-2xl border border-gray-100 p-4 flex flex-col items-center gap-2 text-center shadow-sm"
+            >
+              <div className="w-9 h-9 bg-farm-green/10 rounded-xl flex items-center justify-center">
+                <Icon className="w-5 h-5 text-farm-green" />
+              </div>
+              <p className="text-xs font-semibold text-gray-700">{label}</p>
             </div>
           ))}
-        </div>
-      </section>
+        </motion.div>
+      </div>
 
-      {/* ── How it works ────────────────────────────────────────────────── */}
-      <section className="bg-white border-y border-gray-100 py-12">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <h2 className="text-2xl font-bold text-gray-900 mb-8 text-center">How It Works</h2>
-          <div className="grid sm:grid-cols-3 gap-6 text-center">
-            {[
-              { step: "1", emoji: "🗺", title: "Select Your Farm", desc: "Pick a test farm, enter coordinates, or draw your farm boundary on the Tamil Nadu map" },
-              { step: "2", emoji: "🤖", title: "AI Analyses Data", desc: "Mistral LLM calls real-time tools: satellite NDVI, weather API, mandi prices, soil profile" },
-              { step: "3", emoji: "📊", title: "Get Insights", desc: "Receive a prioritised action card, crop rankings, irrigation schedule, and subsidy matches" },
-            ].map(({ step, emoji, title, desc }) => (
-              <div key={step} className="relative">
-                <div className="w-12 h-12 bg-green-100 text-green-700 rounded-full flex items-center justify-center text-xl font-bold mx-auto mb-3">
-                  {step}
-                </div>
-                <div className="text-3xl mb-2">{emoji}</div>
-                <h3 className="font-semibold text-gray-900 mb-1">{title}</h3>
-                <p className="text-sm text-gray-500">{desc}</p>
-              </div>
-            ))}
+      {/* ── Footer */}
+      <footer className="border-t border-gray-100 py-6">
+        <div className="max-w-2xl mx-auto px-5 sm:px-8 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="w-5 h-5 bg-farm-green rounded-md flex items-center justify-center">
+              <Leaf className="w-2.5 h-2.5 text-white" />
+            </div>
+            <span className="font-serif font-bold text-farm-green text-sm">FarmOps</span>
           </div>
-        </div>
-      </section>
-
-      {/* ── Data sources ────────────────────────────────────────────────── */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
-        <div className="bg-gradient-to-r from-green-50 to-blue-50 border border-green-100 rounded-2xl p-6">
-          <h3 className="text-lg font-semibold text-gray-800 mb-3">🛰 Data Sources Used</h3>
-          <div className="flex flex-wrap gap-3">
-            {[
-              "Sentinel-2 / Google Earth Engine (NDVI)",
-              "IMD / OpenWeatherMap (Weather)",
-              "AGMARKNET / data.gov.in (Mandi Prices)",
-              "ISRO Soil Grids (Soil Profiles)",
-              "Mistral AI (LLM Reasoning)",
-              "Tamil Nadu Agriculture Dept (Schemes)",
-            ].map((src) => (
-              <span
-                key={src}
-                className="px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-xs text-gray-600 shadow-sm"
-              >
-                {src}
-              </span>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ── Footer ──────────────────────────────────────────────────────── */}
-      <footer className="bg-gray-900 text-white py-8 mt-4">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <p className="text-gray-400 text-sm">
-            FarmOps v0.1.0 · Location-Based Insights Engine for Tamil Nadu Farmers
-          </p>
-          <p className="text-gray-600 text-xs mt-1">
-            Built with Remix · FastAPI · Mistral AI · Supabase · Tailwind CSS
-          </p>
+          <p className="text-xs text-gray-400">Remix · FastAPI · Mistral AI</p>
         </div>
       </footer>
     </div>

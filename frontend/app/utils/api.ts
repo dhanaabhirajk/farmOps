@@ -1,5 +1,5 @@
 export async function fetchFarmSnapshot(farmId: string) {
-  const response = await fetch(`${process.env.API_URL || 'http://localhost:8000'}/api/farm/snapshot?farm_id=${farmId}`);
+  const response = await fetch(`${process.env.API_URL || 'http://localhost:8000'}/api/v1/farm/snapshot?farm_id=${farmId}`);
   if (!response.ok) {
     throw new Error('Failed to fetch farm snapshot');
   }

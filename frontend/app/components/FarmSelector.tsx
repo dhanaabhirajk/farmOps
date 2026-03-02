@@ -6,9 +6,8 @@
  * Supports: manual coordinate entry, predefined test farms, and polygon point drawing.
  */
 
-import { useState, useRef, useCallback, type FC } from "react";
-import { Button } from "~/components/ui/Button";
-import { Card } from "~/components/ui/Card";
+import { useState, useRef, useCallback, useEffect, type FC } from "react";
+import { useNavigate } from "@remix-run/react";
 
 export interface FarmPolygon {
   coordinates: Array<[number, number]>; // [lon, lat] pairs
@@ -126,7 +125,7 @@ const MapGrid: FC<{
     .join(" ");
 
   return (
-    <div className="relative border border-gray-300 rounded-lg overflow-hidden bg-green-50">
+    <div className="relative border border-gray-100 rounded-2xl overflow-hidden bg-farm-light">
       <div className="absolute top-1 left-1 text-xs text-gray-400 bg-white/70 px-1 rounded">
         Tamil Nadu — Click to place farm location
       </div>
@@ -248,7 +247,8 @@ export const FarmSelector: FC<FarmSelectorProps> = ({
   onFarmSelected,
   initialFarm,
 }) => {
-  const [mode, setMode] = useState<"preset" | "manual" | "draw">("preset");
+  const navigate = useNavigate();
+  const [mode, setMode] = useState<"preset" | "manual">("preset");
   const [selectedFarmId, setSelectedFarmId] = useState<string>("");
   const [lat, setLat] = useState<number>(initialFarm?.lat ?? 10.787);
   const [lon, setLon] = useState<number>(initialFarm?.lon ?? 79.1378);
@@ -256,20 +256,12 @@ export const FarmSelector: FC<FarmSelectorProps> = ({
   const [mainCrop, setMainCrop] = useState<string>(initialFarm?.main_crop ?? "Rice");
   const [areaAcres, setAreaAcres] = useState<number>(initialFarm?.area_acres ?? 5.0);
   const [farmName, setFarmName] = useState<string>(initialFarm?.farm_name ?? "");
-  const [polygonPoints, setPolygonPoints] = useState<Array<[number, number]>>([]);
   const [error, setError] = useState<string>("");
 
-  const handleMapClick = useCallback(
-    (clickLat: number, clickLon: number) => {
-      if (mode === "draw") {
-        setPolygonPoints((prev) => [...prev, [clickLon, clickLat]]);
-      } else {
-        setLat(clickLat);
-        setLon(clickLon);
-      }
-    },
-    [mode]
-  );
+  const handleMapClick = useCallback((clickLat: number, clickLon: number) => {
+    setLat(clickLat);
+    setLon(clickLon);
+  }, []);
 
   const handlePresetSelect = (farm: FarmLocation) => {
     setSelectedFarmId(farm.farm_id);
@@ -279,117 +271,96 @@ export const FarmSelector: FC<FarmSelectorProps> = ({
     setMainCrop(farm.main_crop);
     setAreaAcres(farm.area_acres);
     setFarmName(farm.farm_name);
-    // Navigate immediately on card click — no need to also press the button
     onFarmSelected(farm);
-  };
-
-  const computeCentroid = (pts: Array<[number, number]>): [number, number] => {
-    const lon = pts.reduce((s, p) => s + p[0], 0) / pts.length;
-    const lat = pts.reduce((s, p) => s + p[1], 0) / pts.length;
-    return [lon, lat];
   };
 
   const handleSubmit = () => {
     setError("");
 
     if (mode === "preset") {
-      if (!selectedFarmId) {
-        setError("Please select a test farm.");
-        return;
-      }
+      if (!selectedFarmId) { setError("Please select a test farm."); return; }
       const farm = TEST_FARMS.find((f) => f.farm_id === selectedFarmId);
       if (!farm) return;
       onFarmSelected(farm);
       return;
     }
 
-    if (!lat || !lon) {
-      setError("Please provide a valid location (latitude & longitude).");
-      return;
-    }
-    if (lat < 8 || lat > 13.5 || lon < 76 || lon > 80.5) {
-      setError("Location must be within Tamil Nadu bounds.");
-      return;
-    }
-    if (areaAcres <= 0) {
-      setError("Farm area must be greater than 0 acres.");
-      return;
-    }
-
-    let polygon: FarmPolygon | undefined;
-    if (mode === "draw" && polygonPoints.length >= 3) {
-      const centroid = computeCentroid(polygonPoints);
-      polygon = { coordinates: polygonPoints, centroid, area_acres: areaAcres };
-    }
+    if (!lat || !lon) { setError("Please provide a valid location (latitude & longitude)."); return; }
+    if (lat < 8 || lat > 13.5 || lon < 76 || lon > 80.5) { setError("Location must be within Tamil Nadu bounds."); return; }
+    if (areaAcres <= 0) { setError("Farm area must be greater than 0 acres."); return; }
 
     onFarmSelected({
       farm_id: crypto.randomUUID(),
       farm_name: farmName || `${district} Farm`,
-      lat,
-      lon,
-      district,
+      lat, lon, district,
       main_crop: mainCrop,
       area_acres: areaAcres,
-      polygon,
     });
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       {/* Mode tabs */}
-      <div className="flex gap-2 border-b border-gray-200 pb-2">
-        {(["preset", "manual", "draw"] as const).map((m) => (
+      <div className="flex gap-2 flex-wrap">
+        {(["preset", "manual"] as const).map((m) => (
           <button
             key={m}
             onClick={() => setMode(m)}
-            className={`px-4 py-2 text-sm font-medium rounded-t-lg transition-colors ${
+            className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium rounded-xl transition-all ${
               mode === m
-                ? "bg-green-600 text-white"
-                : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                ? "bg-farm-green text-white shadow-md shadow-farm-green/20"
+                : "bg-white border border-gray-200 text-gray-600 hover:border-farm-green/40 hover:text-farm-green"
             }`}
           >
-            {m === "preset" ? "🗂 Test Farms" : m === "manual" ? "📍 Enter Location" : "✏️ Draw Boundary"}
+            {m === "preset" ? "🗂 Test Farms" : "📍 Enter Location"}
           </button>
         ))}
+        {/* Draw Boundary → navigate to dedicated sketch page */}
+        <button
+          onClick={() => navigate("/sketch")}
+          className="flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium rounded-xl transition-all bg-white border border-gray-200 text-gray-600 hover:border-farm-green/40 hover:text-farm-green"
+        >
+          ✏️ Draw Boundary
+        </button>
       </div>
 
       {/* Preset mode */}
       {mode === "preset" && (
         <div className="space-y-3">
-          <p className="text-sm text-gray-600">
+          <p className="text-sm text-gray-500">
             Select a pre-loaded test farm to get started instantly.
           </p>
           {TEST_FARMS.map((farm) => (
             <div
               key={farm.farm_id}
               onClick={() => handlePresetSelect(farm)}
-              className={`p-4 rounded-lg border-2 cursor-pointer transition-all hover:shadow-md ${
+              className={`p-4 rounded-2xl border cursor-pointer transition-all hover:shadow-md hover:-translate-y-0.5 ${
                 selectedFarmId === farm.farm_id
-                  ? "border-green-500 bg-green-50"
-                  : "border-gray-200 hover:border-green-300 bg-white"
+                  ? "border-farm-green bg-farm-green/5 shadow-sm"
+                  : "border-gray-100 hover:border-farm-green/30 bg-white"
               }`}
             >
               <div className="flex items-center justify-between">
                 <div>
                   <h4 className="font-semibold text-gray-900">{farm.farm_name}</h4>
-                  <p className="text-sm text-gray-500">
+                  <p className="text-sm text-gray-500 mt-0.5">
                     {farm.district} · {farm.main_crop} · {farm.area_acres} acres
                   </p>
                   <p className="text-xs text-gray-400 mt-0.5">
                     {farm.lat.toFixed(4)}°N, {farm.lon.toFixed(4)}°E
                   </p>
                 </div>
-                <span className="text-green-500 text-lg ml-2">→</span>
+                <span className="text-farm-green text-lg ml-2">→</span>
               </div>
             </div>
           ))}
         </div>
       )}
 
-      {/* Manual mode */}
+      {/* Manual / Enter Location mode */}
       {mode === "manual" && (
         <div className="space-y-4">
-          <p className="text-sm text-gray-600">
+          <p className="text-sm text-gray-500">
             Click the map or enter coordinates manually to set your farm location.
           </p>
           <MapGrid
@@ -400,193 +371,63 @@ export const FarmSelector: FC<FarmSelectorProps> = ({
           />
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Latitude (°N)
-              </label>
-              <input
-                type="number"
-                step="0.0001"
-                min="8"
-                max="13.5"
-                value={lat}
+              <label className="block text-xs font-medium text-gray-500 mb-1.5">Latitude (°N)</label>
+              <input type="number" step="0.0001" min="8" max="13.5" value={lat}
                 onChange={(e) => setLat(parseFloat(e.target.value))}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-green-500 focus:border-green-500"
-              />
+                className="w-full px-4 py-2.5 bg-gray-50 rounded-xl border-transparent focus:bg-white focus:ring-2 focus:ring-farm-green/20 outline-none text-sm transition-all" />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Longitude (°E)
-              </label>
-              <input
-                type="number"
-                step="0.0001"
-                min="76"
-                max="80.5"
-                value={lon}
+              <label className="block text-xs font-medium text-gray-500 mb-1.5">Longitude (°E)</label>
+              <input type="number" step="0.0001" min="76" max="80.5" value={lon}
                 onChange={(e) => setLon(parseFloat(e.target.value))}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-green-500 focus:border-green-500"
-              />
+                className="w-full px-4 py-2.5 bg-gray-50 rounded-xl border-transparent focus:bg-white focus:ring-2 focus:ring-farm-green/20 outline-none text-sm transition-all" />
             </div>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">District</label>
-              <select
-                value={district}
-                onChange={(e) => setDistrict(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-green-500 focus:border-green-500"
-              >
-                {TN_DISTRICTS.map((d) => (
-                  <option key={d} value={d}>{d}</option>
-                ))}
+              <label className="block text-xs font-medium text-gray-500 mb-1.5">District</label>
+              <select value={district} onChange={(e) => setDistrict(e.target.value)}
+                className="w-full px-4 py-2.5 bg-gray-50 rounded-xl border-transparent focus:bg-white focus:ring-2 focus:ring-farm-green/20 outline-none text-sm transition-all">
+                {TN_DISTRICTS.map((d) => <option key={d} value={d}>{d}</option>)}
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Main Crop</label>
-              <select
-                value={mainCrop}
-                onChange={(e) => setMainCrop(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-green-500 focus:border-green-500"
-              >
-                {CROPS.map((c) => (
-                  <option key={c} value={c}>{c}</option>
-                ))}
+              <label className="block text-xs font-medium text-gray-500 mb-1.5">Main Crop</label>
+              <select value={mainCrop} onChange={(e) => setMainCrop(e.target.value)}
+                className="w-full px-4 py-2.5 bg-gray-50 rounded-xl border-transparent focus:bg-white focus:ring-2 focus:ring-farm-green/20 outline-none text-sm transition-all">
+                {CROPS.map((c) => <option key={c} value={c}>{c}</option>)}
               </select>
             </div>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Farm Area (acres)
-              </label>
-              <input
-                type="number"
-                step="0.1"
-                min="0.1"
-                max="1000"
-                value={areaAcres}
+              <label className="block text-xs font-medium text-gray-500 mb-1.5">Farm Area (acres)</label>
+              <input type="number" step="0.1" min="0.1" max="1000" value={areaAcres}
                 onChange={(e) => setAreaAcres(parseFloat(e.target.value))}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-green-500 focus:border-green-500"
-              />
+                className="w-full px-4 py-2.5 bg-gray-50 rounded-xl border-transparent focus:bg-white focus:ring-2 focus:ring-farm-green/20 outline-none text-sm transition-all" />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Farm Name (optional)
-              </label>
-              <input
-                type="text"
-                value={farmName}
-                onChange={(e) => setFarmName(e.target.value)}
+              <label className="block text-xs font-medium text-gray-500 mb-1.5">Farm Name (optional)</label>
+              <input type="text" value={farmName} onChange={(e) => setFarmName(e.target.value)}
                 placeholder={`${district} Farm`}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-green-500 focus:border-green-500"
-              />
+                className="w-full px-4 py-2.5 bg-gray-50 rounded-xl border-transparent focus:bg-white focus:ring-2 focus:ring-farm-green/20 outline-none text-sm transition-all" />
             </div>
           </div>
-        </div>
-      )}
-
-      {/* Draw mode */}
-      {mode === "draw" && (
-        <div className="space-y-4">
-          <p className="text-sm text-gray-600">
-            Click on the map to add boundary points for your farm polygon. Minimum 3 points required.
-          </p>
-          <MapGrid
-            selectedLat={lat}
-            selectedLon={lon}
-            polygonPoints={polygonPoints}
-            onPointClick={handleMapClick}
-          />
-          <div className="flex items-center justify-between text-sm">
-            <span className="text-gray-600">
-              {polygonPoints.length === 0
-                ? "No points added yet"
-                : `${polygonPoints.length} point${polygonPoints.length > 1 ? "s" : ""} added`}
-              {polygonPoints.length >= 3 && (
-                <span className="ml-2 text-green-600 font-medium">✓ Valid polygon</span>
-              )}
-            </span>
-            {polygonPoints.length > 0 && (
-              <button
-                onClick={() => setPolygonPoints((p) => p.slice(0, -1))}
-                className="text-red-500 hover:text-red-700"
-              >
-                Undo last point
-              </button>
-            )}
-            {polygonPoints.length > 0 && (
-              <button
-                onClick={() => setPolygonPoints([])}
-                className="text-gray-400 hover:text-gray-600"
-              >
-                Clear all
-              </button>
-            )}
-          </div>
-          {polygonPoints.length >= 3 && (
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">District</label>
-                <select
-                  value={district}
-                  onChange={(e) => setDistrict(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
-                >
-                  {TN_DISTRICTS.map((d) => <option key={d} value={d}>{d}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Main Crop</label>
-                <select
-                  value={mainCrop}
-                  onChange={(e) => setMainCrop(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
-                >
-                  {CROPS.map((c) => <option key={c} value={c}>{c}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Farm Area (acres)
-                </label>
-                <input
-                  type="number"
-                  step="0.1"
-                  min="0.1"
-                  value={areaAcres}
-                  onChange={(e) => setAreaAcres(parseFloat(e.target.value))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Farm Name</label>
-                <input
-                  type="text"
-                  value={farmName}
-                  onChange={(e) => setFarmName(e.target.value)}
-                  placeholder={`${district} Farm`}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
-                />
-              </div>
-            </div>
-          )}
         </div>
       )}
 
       {/* Error */}
       {error && (
-        <div className="p-3 bg-red-50 border border-red-200 rounded-md text-sm text-red-700">
-          {error}
-        </div>
+        <div className="p-3.5 bg-red-50 border border-red-100 rounded-xl text-sm text-red-600">{error}</div>
       )}
 
       {/* Submit */}
-      <Button
+      <button
         onClick={handleSubmit}
-        className="w-full bg-green-600 hover:bg-green-700 text-white py-3"
+        className="w-full py-4 bg-farm-green text-white rounded-xl font-semibold shadow-lg shadow-farm-green/20 hover:bg-green-800 transition-all flex items-center justify-center gap-2"
       >
-        {mode === "preset" ? "🌾 Analyse Selected Farm" : "🌾 Analyse This Farm"}
-      </Button>
+        ⚡ {mode === "preset" ? "Analyse Selected Farm" : "Analyse This Farm"}
+      </button>
 
       <p className="text-xs text-gray-400 text-center">
         Location data is used only to fetch weather, soil, and market insights for your farm.

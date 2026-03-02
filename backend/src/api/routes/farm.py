@@ -28,6 +28,7 @@ class FarmSnapshotResponse(BaseModel):
 @router.get("/snapshot")
 async def get_farm_snapshot(
     farm_id: str = Query(..., description="Farm UUID"),
+    farm_name: Optional[str] = Query(None, description="Human-readable farm name"),
     lat: Optional[float] = Query(None, description="Farm centroid latitude"),
     lon: Optional[float] = Query(None, description="Farm centroid longitude"),
     district: Optional[str] = Query(None, description="District name"),
@@ -69,35 +70,86 @@ async def get_farm_snapshot(
 
         from ...services.snapshot.snapshot_generator import SnapshotGenerator
         from ...services.snapshot.snapshot_cache import SnapshotCache
+        from ...services.snapshot import snapshot_memory_cache as mem_cache
+        from ...services.snapshot import snapshot_file_cache as file_cache
 
-        cache = SnapshotCache()
+        # Resolve coordinates with defaults
+        _lat = lat if lat is not None else 10.7870
+        _lon = lon if lon is not None else 79.1378
+        _district = district or "Thanjavur"
 
-        # Check cache first
+        # Compute a stable hash for this exact parameter combination
+        p_hash = mem_cache.params_hash(
+            farm_uuid, _lat, _lon, _district, main_crop, area_acres
+        )
+
+        # ── Tier 1: In-memory cache (sub-ms, process-scoped) ─────────────────
         if use_cache:
-            cached = cache.get_cached_snapshot(farm_uuid)
-            if cached:
+            mem_hit = mem_cache.get(farm_uuid, _lat, _lon, _district, main_crop, area_acres)
+            if mem_hit:
                 return FarmSnapshotResponse(
                     success=True,
-                    data=cached,
+                    data=mem_hit,
                     metadata={
                         "cached": True,
+                        "cache_tier": "memory",
                         "timestamp": datetime.now(timezone.utc).isoformat(),
                         "version": "1.0",
                     },
                 )
 
+        # ── Tier 2: File cache (persists across container restarts) ──────────
+        if use_cache:
+            file_hit = file_cache.get(p_hash)
+            if file_hit:
+                # Warm the in-memory cache for subsequent requests this session
+                mem_cache.put(farm_uuid, _lat, _lon, _district, main_crop, area_acres, file_hit)
+                return FarmSnapshotResponse(
+                    success=True,
+                    data=file_hit,
+                    metadata={
+                        "cached": True,
+                        "cache_tier": "file",
+                        "timestamp": datetime.now(timezone.utc).isoformat(),
+                        "version": "1.0",
+                    },
+                )
+
+        # ── Tier 3: Supabase DB cache (optional, may not be configured) ──────
+        db_cache = SnapshotCache()
+
+        if use_cache:
+            try:
+                db_hit = db_cache.get_cached_snapshot(farm_uuid, params_hash=p_hash)
+                if db_hit:
+                    mem_cache.put(farm_uuid, _lat, _lon, _district, main_crop, area_acres, db_hit)
+                    file_cache.put(p_hash, db_hit)
+                    return FarmSnapshotResponse(
+                        success=True,
+                        data=db_hit,
+                        metadata={
+                            "cached": True,
+                            "cache_tier": "database",
+                            "timestamp": datetime.now(timezone.utc).isoformat(),
+                            "version": "1.0",
+                        },
+                    )
+            except Exception as db_err:
+                logger.debug("DB cache unavailable (will use file cache): %s", db_err)
+
+        # ── Generate fresh snapshot via LLM agent ────────────────────────────
         # Build farm_data from query params
         # In production this would be fetched from Supabase by farm_uuid
         farm_data = {
-            "name": f"Farm {str(farm_uuid)[:8]}",
+            "name": farm_name or f"Farm {str(farm_uuid)[:8]}",
             "centroid": {
                 "coordinates": [
-                    lon if lon is not None else 79.1378,   # lon (Thanjavur default)
-                    lat if lat is not None else 10.7870,   # lat (Thanjavur default)
+                    _lon,   # lon
+                    _lat,   # lat
                 ],
             },
             "area_acres": area_acres,
-            "district": district or "Thanjavur",
+            "district": _district,
         }
 
         # Generate snapshot using LLM agent
@@ -108,12 +160,32 @@ async def get_farm_snapshot(
             main_crop=main_crop,
         )
 
-        # Cache the result
-        cache.cache_snapshot(farm_uuid, result.get("payload", {}))
+        # Persist to all cache tiers so the result survives restarts
+        result_payload = result.get("payload", {})
+
+        # Tier 1: memory (instant on next request this session)
+        mem_cache.put(
+            farm_uuid, _lat, _lon, _district, main_crop, area_acres, result_payload
+        )
+
+        # Tier 2: file (persists across container restarts — always reliable)
+        file_cache.put(p_hash, result_payload)
+
+        # Tier 3: Supabase DB (best-effort; may fail if not configured or FK missing)
+        try:
+            db_cache.cache_snapshot(
+                farm_uuid,
+                result_payload,
+                confidence_overall=result.get("confidence_overall", 0),
+                sources_used=result.get("sources_used", []),
+                params_hash=p_hash,
+            )
+        except Exception as db_err:
+            logger.debug("DB cache write skipped (file cache used instead): %s", db_err)
 
         return FarmSnapshotResponse(
             success=True,
-            data=result.get("payload"),
+            data=result_payload,
             metadata={
                 "cached": False,
                 "timestamp": result.get("generated_at", datetime.now(timezone.utc).isoformat()),

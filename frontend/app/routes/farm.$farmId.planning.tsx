@@ -1,14 +1,79 @@
-import React from 'react';
-import { useOutletContext } from '@remix-run/react';
-import { Leaf, Sprout } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { json, type LoaderFunctionArgs } from '@remix-run/node';
+import { useOutletContext, useLoaderData, Link } from '@remix-run/react';
+import { Leaf, Sprout, RefreshCw, ChevronRight, Clock, AlertCircle } from 'lucide-react';
 import { cn } from '~/lib/utils'; // Use our Remix util
+
+interface CropItem {
+  name: string;
+  expected_yield_kg_acre: number;
+  production_cost_per_acre: number;
+  expected_profit_per_acre: number;
+  risk_score: number;
+  planting_window: { start: string; end: string } | null;
+  harvest_window: { start: string; end: string } | null;
+  duration_days: number;
+  water_requirement_mm: string;
+  reason: string;
+  confidence: number;
+}
+
+interface PersistedRec {
+  id: string;
+  confidence: number;
+  explanation: string;
+  model_version: string;
+  created_at: string;
+  expires_at: string | null;
+  human_review_required: boolean;
+  payload: {
+    season: string;
+    recommended_crops: CropItem[];
+    explanation: string;
+    confidence: number;
+    generated_at: string;
+  };
+}
+
+export async function loader({ params, request }: LoaderFunctionArgs) {
+  const farmId = params.farmId;
+  if (!farmId) return json({ farmId: '', persistedRecs: [] as PersistedRec[] });
+
+  const backendUrl = process.env.BACKEND_URL || 'http://farmops-backend-dev:8000';
+  try {
+    const res = await fetch(
+      `${backendUrl}/api/v1/farm/recommendations/${farmId}?status=active&limit=5`,
+      { headers: { 'Content-Type': 'application/json' } }
+    );
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const body = await res.json();
+    const rows: PersistedRec[] = body?.data?.recommendations ?? [];
+    return json({ farmId, persistedRecs: rows });
+  } catch (err) {
+    console.error('[planning] failed to load recommendations:', err);
+    return json({ farmId, persistedRecs: [] as PersistedRec[] });
+  }
+}
 
 export default function PlanningRoute() {
   const { farmData } = useOutletContext<{ farmData: any }>();
-  const recommendations = farmData?.recommendations || [];
+  const { persistedRecs } = useLoaderData<typeof loader>();
 
-  // TODO: Use real crops from farmData when available
-  const activeCrops = farmData?.crops || []; 
+  // Flatten persisted recs → array of crop items with extra context
+  const persistedCrops: Array<CropItem & { recId: string; season: string; recCreatedAt: string; humanReview: boolean; recConfidence: number }> =
+    persistedRecs.flatMap((rec) =>
+      (rec.payload?.recommended_crops ?? []).map((crop) => ({
+        ...crop,
+        recId: rec.id,
+        season: rec.payload?.season ?? '',
+        recCreatedAt: rec.created_at,
+        humanReview: rec.human_review_required,
+        recConfidence: rec.confidence,
+      }))
+    );
+
+  // Still support legacy farmData.crops if present
+  const activeCrops = farmData?.crops || [];
 
   return (
     <div className="space-y-8">
