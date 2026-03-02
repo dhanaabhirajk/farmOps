@@ -159,13 +159,13 @@ export default function Home() {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ duration: 0.5, delay: 0.2 }}
-          className="mt-10 grid grid-cols-2 sm:grid-cols-4 gap-3"
+          className="mt-10 grid grid-cols-2 sm:grid-cols-3 gap-3"
         >
           {[
             { icon: TrendingUp, label: "NDVI Snapshot" },
             { icon: Sprout,     label: "Crop Recs" },
-            { icon: Droplets,   label: "Irrigation" },
-            { icon: IndianRupee, label: "Mandi Prices" },
+            // { icon: Droplets,   label: "Irrigation" },
+            // { icon: IndianRupee, label: "Mandi Prices" },
           ].map(({ icon: Icon, label }) => (
             <div
               key={label}

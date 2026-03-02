@@ -192,12 +192,12 @@ export const FarmSnapshotCard: FC<FarmSnapshotCardProps> = ({
 
       {/* Navigation to other features */}
       <SectionDivider title="Next Steps" />
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-2 gap-3">
         {[
           { href: "recommendations", emoji: "🌱", label: "Crop Recs" },
           // { href: "irrigation", emoji: "💧", label: "Irrigation" },
           { href: "harvest", emoji: "🚜", label: "Harvest Timing" },
-          { href: "subsidies", emoji: "📋", label: "Subsidies" },
+          // { href: "subsidies", emoji: "📋", label: "Subsidies" },
         ].map(({ href, emoji, label }) => (
           <a
             key={href}

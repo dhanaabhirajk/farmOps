@@ -116,7 +116,7 @@ export default function FarmDashboardLayout() {
           <NavButton to="snapshot" farmParams={farmParams} icon={TrendingUp} label="Snapshot" active={activeSegment === 'snapshot'} desktop />
           <NavButton to="planning" farmParams={farmParams} icon={Sprout} label="Crops" active={activeSegment === 'planning'} desktop />
           <NavButton to="inventory" farmParams={farmParams} icon={Package} label="Stock" active={activeSegment === 'inventory'} desktop />
-          <NavButton to="schemes" farmParams={farmParams} icon={IndianRupee} label="Schemes" active={activeSegment === 'schemes'} desktop />
+          {/* <NavButton to="schemes" farmParams={farmParams} icon={IndianRupee} label="Schemes" active={activeSegment === 'schemes'} desktop /> */}
           <div className="mt-auto">
             <button 
               onClick={() => setIsSettingsOpen(true)}

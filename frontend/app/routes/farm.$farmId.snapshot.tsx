@@ -8,8 +8,9 @@
  * Pre-seeded farms: uses farmId UUID to identify the farm.
  */
 
-import type { LoaderFunctionArgs, MetaFunction, ShouldRevalidateFunctionArgs } from "@remix-run/node";
+import type { LoaderFunctionArgs, MetaFunction } from "@remix-run/node";
 import { json } from "@remix-run/node";
+import type { ClientLoaderFunctionArgs, ShouldRevalidateFunctionArgs } from "@remix-run/react";
 import {
   Link,
   useLoaderData,
@@ -41,6 +42,41 @@ export function shouldRevalidate({
     return false; // same farm, just switching tabs — keep cached data
   }
   return defaultShouldRevalidate;
+}
+
+// ─── Client-side snapshot cache ─────────────────────────────────────────────
+// shouldRevalidate only fires for routes that are *currently matched*. Because
+// snapshot, harvest, irrigation, and recommendations are sibling routes,
+// navigating away unmounts the snapshot route — so returning to it triggers a
+// fresh server loader call even when shouldRevalidate would return false.
+// This module-level cache (lives for the tab session) is checked by clientLoader
+// before falling back to the server, preventing redundant API calls.
+const _snapshotCache = new Map<string, LoaderData>();
+
+function _cacheKey(url: URL): string {
+  const p = new URLSearchParams(url.searchParams);
+  p.delete("use_cache"); // don't let the force-refresh flag affect the key
+  p.sort();
+  return `${url.pathname}?${p.toString()}`;
+}
+
+export async function clientLoader({ request, serverLoader }: ClientLoaderFunctionArgs) {
+  const url = new URL(request.url);
+  const forceRefresh = url.searchParams.get("use_cache") === "false";
+  const key = _cacheKey(url);
+
+  if (!forceRefresh && _snapshotCache.has(key)) {
+    return _snapshotCache.get(key)!;
+  }
+
+  // Cache miss or forced refresh — call the server loader
+  const data = await serverLoader<typeof loader>();
+  if (!data.error) {
+    _snapshotCache.set(key, data);
+  } else {
+    _snapshotCache.delete(key); // don't persist errors
+  }
+  return data;
 }
 
 export const meta: MetaFunction<typeof loader> = ({ data }) => {
@@ -275,7 +311,7 @@ function normaliseSnapshot(
 // ─── Component ───────────────────────────────────────────────────────────────
 
 export default function FarmSnapshotPage() {
-  const data = useLoaderData<typeof loader>();
+  const data = useLoaderData<typeof clientLoader>();
   const parentData = useRouteLoaderData("routes/farm.$farmId") as
     | { farmName: string | null }
     | undefined;
@@ -283,6 +319,15 @@ export default function FarmSnapshotPage() {
   const revalidator = useRevalidator();
   const [searchParams] = useSearchParams();
   const isLoading = navigation.state === "loading" || revalidator.state === "loading";
+
+  // Seed the client cache from the initial SSR loader data so the very first
+  // "Back to Snapshot" navigation after a server-rendered page load is also fast.
+  useEffect(() => {
+    if (data.snapshot && !data.error) {
+      const url = new URL(window.location.href);
+      _snapshotCache.set(_cacheKey(url), data);
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Strip use_cache=false from the URL after a successful load ────────────
   // This ensures repeat visits (bookmarks, tabs, sharing the URL) don't

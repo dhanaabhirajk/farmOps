@@ -24,6 +24,7 @@ class MistralClient:
 
         # Mistral uses OpenAI-compatible API
         self.client = AsyncOpenAI(
+            timeout=90,
             api_key=api_key,
             base_url="https://api.mistral.ai/v1",
         )

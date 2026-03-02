@@ -23,7 +23,13 @@ def _client():
         return get_supabase_service()
     except ValueError:
         logger.debug("Service role key not set; using anon Supabase client")
-        return get_supabase()
+        try:
+            return get_supabase()
+        except ValueError as exc:
+            raise RuntimeError(
+                "Supabase client not configured: SUPABASE_URL and SUPABASE_KEY "
+                "must be set in environment variables."
+            ) from exc
 
 
 class RecommendationRepository:

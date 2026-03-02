@@ -6,7 +6,7 @@
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 -- Create recommendations table
-CREATE TABLE IF NOT EXISTS recommendations (
+CREATE TABLE IF NOT EXISTS public.recommendations (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     farm_id UUID NOT NULL,
     type VARCHAR(50) NOT NULL CHECK (type IN ('crop', 'irrigation', 'harvest', 'subsidy', 'action')),
@@ -24,51 +24,51 @@ CREATE TABLE IF NOT EXISTS recommendations (
     -- Foreign key constraint
     CONSTRAINT fk_recommendations_farm
         FOREIGN KEY (farm_id)
-        REFERENCES farms(id)
+        REFERENCES public.farms(id)
         ON DELETE CASCADE
 );
 
 -- Create indexes for performance
 CREATE INDEX idx_recommendations_farm_type_status 
-    ON recommendations(farm_id, type, status, created_at DESC);
+    ON public.recommendations(farm_id, type, status, created_at DESC);
 
 CREATE INDEX idx_recommendations_confidence 
-    ON recommendations(confidence DESC);
+    ON public.recommendations(confidence DESC);
 
 CREATE INDEX idx_recommendations_expires_at 
-    ON recommendations(expires_at) 
+    ON public.recommendations(expires_at) 
     WHERE expires_at IS NOT NULL AND status = 'active';
 
 -- Add comments for documentation
-COMMENT ON TABLE recommendations IS 'Stores AI-generated recommendations for farms: crop choices, irrigation schedules, harvest timing, and subsidy matches';
-COMMENT ON COLUMN recommendations.type IS 'Recommendation type: crop (planting), irrigation (watering), harvest (timing), subsidy (eligibility), action (general)';
-COMMENT ON COLUMN recommendations.payload IS 'Structured recommendation data (JSON varies by type)';
-COMMENT ON COLUMN recommendations.confidence IS 'Overall confidence score 0-100 based on data quality and model certainty';
-COMMENT ON COLUMN recommendations.sources IS 'Array of data sources used: [{source_name, data_age_hours, confidence_contribution_pct}]';
-COMMENT ON COLUMN recommendations.explanation IS 'Human-readable recommendation in farmer''s language (Tamil/Hindi/English)';
-COMMENT ON COLUMN recommendations.tool_calls IS 'LLM tool execution log: [{tool_name, inputs, outputs, execution_time_ms}]';
-COMMENT ON COLUMN recommendations.status IS 'Lifecycle: active (current), archived (old), superseded (replaced by newer)';
-COMMENT ON COLUMN recommendations.human_review_required IS 'True if confidence < threshold or conflicting data detected';
-COMMENT ON COLUMN recommendations.expires_at IS 'When recommendation becomes stale (NULL = valid indefinitely)';
+COMMENT ON TABLE public.recommendations IS 'Stores AI-generated recommendations for farms: crop choices, irrigation schedules, harvest timing, and subsidy matches';
+COMMENT ON COLUMN public.recommendations.type IS 'Recommendation type: crop (planting), irrigation (watering), harvest (timing), subsidy (eligibility), action (general)';
+COMMENT ON COLUMN public.recommendations.payload IS 'Structured recommendation data (JSON varies by type)';
+COMMENT ON COLUMN public.recommendations.confidence IS 'Overall confidence score 0-100 based on data quality and model certainty';
+COMMENT ON COLUMN public.recommendations.sources IS 'Array of data sources used: [{source_name, data_age_hours, confidence_contribution_pct}]';
+COMMENT ON COLUMN public.recommendations.explanation IS 'Human-readable recommendation in farmer''s language (Tamil/Hindi/English)';
+COMMENT ON COLUMN public.recommendations.tool_calls IS 'LLM tool execution log: [{tool_name, inputs, outputs, execution_time_ms}]';
+COMMENT ON COLUMN public.recommendations.status IS 'Lifecycle: active (current), archived (old), superseded (replaced by newer)';
+COMMENT ON COLUMN public.recommendations.human_review_required IS 'True if confidence < threshold or conflicting data detected';
+COMMENT ON COLUMN public.recommendations.expires_at IS 'When recommendation becomes stale (NULL = valid indefinitely)';
 
 -- Enable Row-Level Security (RLS)
-ALTER TABLE recommendations ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.recommendations ENABLE ROW LEVEL SECURITY;
 
 -- RLS Policy: Users can only read their own farm recommendations
-CREATE POLICY recommendations_user_read_policy ON recommendations
+CREATE POLICY recommendations_user_read_policy ON public.recommendations
     FOR SELECT
     USING (
         farm_id IN (
-            SELECT id FROM farms WHERE user_id = auth.uid()
+            SELECT id FROM public.farms WHERE user_id = auth.uid()
         )
     );
 
 -- RLS Policy: Backend service can insert recommendations
-CREATE POLICY recommendations_service_insert_policy ON recommendations
+CREATE POLICY recommendations_service_insert_policy ON public.recommendations
     FOR INSERT
     WITH CHECK (true);
 
 -- RLS Policy: Backend service can update recommendations
-CREATE POLICY recommendations_service_update_policy ON recommendations
+CREATE POLICY recommendations_service_update_policy ON public.recommendations
     FOR UPDATE
     USING (true);

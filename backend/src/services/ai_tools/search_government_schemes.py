@@ -112,9 +112,9 @@ For EACH scheme include:
 - name: full official scheme name
 - authority: issuing authority (Central Government / State name)
 - type: one of [subsidy, insurance, credit, price_support, input_support, technology, training]
-- benefit: concise benefit description with ₹ amounts where known
-- description: 3-5 sentence description including important caveats and warnings
-- action_plan: ordered list of steps the farmer should take (5-8 steps)
+- benefit: concise benefit description with ₹ amounts where known (1 sentence)
+- description: 2-3 sentence description with ONE key caveat (keep it brief)
+- action_plan: ordered list of 4-5 steps the farmer should take (keep each step short)
 - eligibility_explanation: why this farmer qualifies (1-2 sentences)
 - required_documents: list of documents needed to apply
 - apply_link: official portal URL
@@ -234,7 +234,7 @@ async def handler(
             ],
             tools=None,
             temperature=0.1,   # Low temperature for factual, consistent output
-            max_tokens=4096,
+            max_tokens=8192,   # Increased — detailed scheme JSON needs more tokens
         )
 
         raw_content = response.get("content") or ""
@@ -248,7 +248,29 @@ async def handler(
                 clean = clean[4:]
             clean = clean.rsplit("```", 1)[0].strip()
 
-        parsed = json.loads(clean)
+        # Attempt parse; if truncated, salvage completed scheme objects
+        try:
+            parsed = json.loads(clean)
+        except json.JSONDecodeError:
+            # Find the last complete scheme object and close the JSON array
+            last_complete = clean.rfind("},")
+            if last_complete == -1:
+                last_complete = clean.rfind("}")
+            if last_complete != -1:
+                salvaged = clean[: last_complete + 1]
+                # Wrap into valid structure
+                array_start = salvaged.find("[")
+                if array_start != -1:
+                    salvaged = '{"schemes":' + salvaged[array_start:] + '],"search_notes":"Response truncated — partial results shown."}'
+                    try:
+                        parsed = json.loads(salvaged)
+                        logger.warning("Salvaged partial JSON from truncated LLM response")
+                    except json.JSONDecodeError:
+                        raise
+                else:
+                    raise
+            else:
+                raise
         schemes_raw: list[dict[str, Any]] = parsed.get("schemes", [])
         search_notes: str = parsed.get("search_notes", "")
 
