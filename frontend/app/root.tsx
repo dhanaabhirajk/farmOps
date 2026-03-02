@@ -8,6 +8,7 @@ import {
   useNavigation,
   useRouteError,
 } from "@remix-run/react";
+// @ts-ignore – Vite handles ?url at build time; tsc cannot resolve this
 import tailwindStyles from "./styles/tailwind.css?url";
 
 export const links: LinksFunction = () => [

@@ -6,6 +6,13 @@ export default {
     extend: {
       colors: {
         // Custom colors for agricultural theme
+        "farm-green": "#2D5A27",
+        "farm-light": "#E8F5E9",
+        "earth-brown": "#8D6E63",
+        "earth-light": "#D7CCC8",
+        "sky-blue": "#E1F5FE",
+        "cream": "#F5F5F0",
+        
         primary: {
           50: "#f0fdf4",
           100: "#dcfce7",
@@ -38,6 +45,7 @@ export default {
       },
       fontFamily: {
         sans: ["Inter", "system-ui", "sans-serif"],
+        serif: ["Cormorant Garamond", "ui-serif", "Georgia", "serif"],
         tamil: ["Noto Sans Tamil", "sans-serif"],
       },
     },

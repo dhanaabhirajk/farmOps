@@ -42,3 +42,6 @@ frontend/test-results/
 .vscode/
 .idea/
 keys/*
+
+# Sample UI reference (not part of the project)
+new_sample_ui/

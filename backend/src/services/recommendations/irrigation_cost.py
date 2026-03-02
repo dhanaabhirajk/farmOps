@@ -1,121 +1,168 @@
-"""Irrigation cost estimator service.
+"""Irrigation Cost Estimator Service.
 
-Calculates cost of irrigation events based on method, water volume,
-energy cost, and labor requirements.
+Calculates the cost of irrigation based on water source, volume, and
+local electricity/fuel rates.
 """
 
 import logging
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 logger = logging.getLogger(__name__)
 
 
-# Energy cost per kWh in INR (Tamil Nadu tariff)
-ENERGY_COST_INR_KWH = 5.50
-
-# Pump efficiency by type
-PUMP_EFFICIENCY: Dict[str, float] = {
-    "submersible": 0.72,
-    "centrifugal": 0.65,
-    "solar": 0.68,
-    "default": 0.65,
-}
-
-# Water requirement (mm) per application by method
-IRRIGATION_METHOD_EFFICIENCY: Dict[str, float] = {
-    "drip": 0.90,
-    "sprinkler": 0.80,
-    "flood": 0.60,
-    "furrow": 0.65,
-    "default": 0.70,
-}
-
-# Labor cost INR per hour in Tamil Nadu
-LABOR_COST_INR_HOUR = 350.0
-
-
 class IrrigationCostEstimator:
-    """Estimate cost of irrigation events."""
+    """Estimate irrigation costs for Tamil Nadu farms."""
+
+    # Electricity rates (INR per kWh) - Tamil Nadu agricultural tariff
+    ELECTRICITY_RATE_INR_KWH = 1.50  # Subsidized agricultural rate in TN
+
+    # Diesel cost (INR per liter) - approximate
+    DIESEL_RATE_INR_LITER = 85.0
+
+    # Water source energy consumption (kWh per 1000 liters)
+    ENERGY_PER_KL: Dict[str, float] = {
+        "borewell": 0.55,      # Deep borewell pump: ~0.55 kWh/kL
+        "canal": 0.10,         # Canal gravity/low-lift: ~0.10 kWh/kL
+        "drip": 0.30,          # Drip system with pump: ~0.30 kWh/kL
+        "sprinkler": 0.40,     # Sprinkler with pump: ~0.40 kWh/kL
+        "rainwater": 0.0,      # Free
+        "flood": 0.12,         # Flood irrigation
+        "tank": 0.08,          # Tank/pond gravity: ~0.08 kWh/kL
+        "default": 0.35,
+    }
+
+    # Labour costs (INR per irrigation event)
+    LABOUR_COST: Dict[str, float] = {
+        "manual": 300.0,
+        "semi_automated": 150.0,
+        "automated": 50.0,
+        "default": 200.0,
+    }
 
     def estimate(
         self,
-        water_volume_mm: float,
-        area_acres: float,
-        irrigation_method: str = "flood",
-        pump_type: str = "default",
-        pump_power_kw: float = 3.5,
-        labor_hours: float = 2.0,
-        energy_cost_per_kwh: float = ENERGY_COST_INR_KWH,
+        volume_liters: float,
+        water_source: str,
+        automation_level: str = "default",
+        schedule_events: int = 1,
+        power_source: str = "electricity",
     ) -> Dict[str, Any]:
         """
-        Estimate cost of an irrigation event.
+        Estimate irrigation costs.
 
         Args:
-            water_volume_mm: Water required (mm equivalent depth)
-            area_acres: Farm area in acres
-            irrigation_method: Method (drip/sprinkler/flood/furrow)
-            pump_type: Pump type (submersible/centrifugal/solar/default)
-            pump_power_kw: Pump motor power (kW)
-            labor_hours: Estimated labor hours
-            energy_cost_per_kwh: Electricity rate (INR/kWh)
+            volume_liters: Total water volume in liters
+            water_source: Source of water (borewell, canal, drip, etc.)
+            automation_level: Level of automation (manual, semi_automated, automated)
+            schedule_events: Number of irrigation events in the period
+            power_source: Power source (electricity, diesel, solar)
 
         Returns:
-            Cost breakdown dict
+            Dict with cost breakdown in INR
         """
         try:
-            method_key = irrigation_method.lower() if irrigation_method.lower() in IRRIGATION_METHOD_EFFICIENCY else "default"
-            pump_key = pump_type.lower() if pump_type.lower() in PUMP_EFFICIENCY else "default"
-
-            efficiency = IRRIGATION_METHOD_EFFICIENCY[method_key]
-
-            # Volume calculation: 1mm on 1 acre = 4046.86 liters
-            area_sq_m = area_acres * 4046.86
-            gross_water_mm = water_volume_mm / efficiency
-            water_volume_liters = (gross_water_mm / 1000) * area_sq_m  # mm → m, × area
-
-            # Pumping time (hours)
-            # Typical pump flow rate: 30,000 L/hr for 3.5kW
-            flow_rate_lph = (pump_power_kw / 3.5) * 30_000
-            pumping_hours = water_volume_liters / flow_rate_lph
+            volume_kl = volume_liters / 1000.0
 
             # Energy cost
-            pump_eff = PUMP_EFFICIENCY[pump_key]
-            actual_kw = pump_power_kw / pump_eff
-            energy_kwh = actual_kw * pumping_hours
-            energy_cost = energy_kwh * energy_cost_per_kwh
+            energy_rate = self.ENERGY_PER_KL.get(water_source.lower(), self.ENERGY_PER_KL["default"])
+            energy_kwh = volume_kl * energy_rate
 
-            # Labor cost
-            labor_cost = labor_hours * LABOR_COST_INR_HOUR
+            if power_source == "diesel":
+                # Diesel engine: ~3.5 liters per kWh equivalent
+                energy_cost_inr = energy_kwh * 3.5 * self.DIESEL_RATE_INR_LITER / 3.5
+            elif power_source == "solar":
+                energy_cost_inr = energy_kwh * 0.20  # Minimal maintenance cost only
+            else:  # electricity
+                energy_cost_inr = energy_kwh * self.ELECTRICITY_RATE_INR_KWH
 
-            # Infrastructure/maintenance (5% of energy+labor)
-            other_cost = (energy_cost + labor_cost) * 0.05
+            # Labour cost
+            labour_rate = self.LABOUR_COST.get(automation_level, self.LABOUR_COST["default"])
+            labour_cost_inr = labour_rate * schedule_events
 
-            total_cost = energy_cost + labor_cost + other_cost
-            cost_per_acre = total_cost / area_acres if area_acres > 0 else 0
+            # Water source infrastructure depreciation (simplified)
+            infra_cost_per_event = {
+                "borewell": 50.0,
+                "drip": 80.0,
+                "sprinkler": 60.0,
+                "canal": 10.0,
+                "tank": 15.0,
+                "default": 30.0,
+            }
+            infra_cost_inr = infra_cost_per_event.get(water_source.lower(), infra_cost_per_event["default"]) * schedule_events
+
+            total_cost_inr = energy_cost_inr + labour_cost_inr + infra_cost_inr
 
             return {
-                "success": True,
-                "water_volume_mm": round(water_volume_mm, 1),
-                "gross_water_mm": round(gross_water_mm, 1),
-                "water_volume_liters": round(water_volume_liters, 0),
-                "irrigation_method": method_key,
-                "pumping_hours": round(pumping_hours, 2),
-                "energy_kwh": round(energy_kwh, 2),
-                "cost_breakdown": {
-                    "energy_inr": round(energy_cost, 2),
-                    "labor_inr": round(labor_cost, 2),
-                    "other_inr": round(other_cost, 2),
+                "total_cost_inr": round(total_cost_inr, 2),
+                "cost_per_acre_inr": round(total_cost_inr, 2),
+                "breakdown": {
+                    "energy_cost_inr": round(energy_cost_inr, 2),
+                    "labour_cost_inr": round(labour_cost_inr, 2),
+                    "infrastructure_cost_inr": round(infra_cost_inr, 2),
                 },
-                "total_cost_inr": round(total_cost, 2),
-                "cost_per_acre_inr": round(cost_per_acre, 2),
-                "efficiency_pct": round(efficiency * 100, 0),
+                "energy_kwh": round(energy_kwh, 3),
+                "volume_kl": round(volume_kl, 2),
+                "cost_per_kl_inr": round(total_cost_inr / volume_kl if volume_kl > 0 else 0, 2),
+                "water_source": water_source,
+                "power_source": power_source,
+                "assumptions": {
+                    "electricity_rate_inr_kwh": self.ELECTRICITY_RATE_INR_KWH,
+                    "energy_per_kl_kwh": energy_rate,
+                    "labour_per_event_inr": labour_rate,
+                },
             }
 
-        except Exception as exc:
-            logger.error(f"Irrigation cost estimation failed: {exc}")
+        except Exception as e:
+            logger.error("Irrigation cost estimation error: %s", e)
             return {
-                "success": False,
-                "error": str(exc),
-                "total_cost_inr": 0,
-                "cost_per_acre_inr": 0,
+                "total_cost_inr": 0.0,
+                "cost_per_acre_inr": 0.0,
+                "breakdown": {},
+                "error": str(e),
             }
+
+    def estimate_seasonal_cost(
+        self,
+        schedule: Dict[str, Any],
+        water_source: str,
+        automation_level: str = "default",
+        power_source: str = "electricity",
+    ) -> Dict[str, Any]:
+        """
+        Estimate total cost for a full irrigation schedule.
+
+        Args:
+            schedule: Generated schedule from IrrigationScheduler
+            water_source: Water source type
+            automation_level: Automation level
+            power_source: Power source type
+
+        Returns:
+            Dict with seasonal cost totals and per-event breakdown
+        """
+        try:
+            events = schedule.get("schedule", [])
+            irrigation_events = [e for e in events if e.get("irrigate", False)]
+
+            if not irrigation_events:
+                return {"total_cost_inr": 0.0, "events_count": 0, "avg_cost_per_event_inr": 0.0}
+
+            total_volume = sum(e.get("volume_liters", 0) for e in irrigation_events)
+            total_cost = self.estimate(
+                volume_liters=total_volume,
+                water_source=water_source,
+                automation_level=automation_level,
+                schedule_events=len(irrigation_events),
+                power_source=power_source,
+            )
+
+            return {
+                **total_cost,
+                "events_count": len(irrigation_events),
+                "avg_cost_per_event_inr": round(total_cost["total_cost_inr"] / len(irrigation_events), 2),
+                "total_volume_liters": total_volume,
+            }
+
+        except Exception as e:
+            logger.error("Seasonal irrigation cost error: %s", e)
+            return {"total_cost_inr": 0.0, "error": str(e)}

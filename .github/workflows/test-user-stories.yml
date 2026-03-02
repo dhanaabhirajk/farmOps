@@ -41,7 +41,7 @@ jobs:
       
       - name: Start Docker Compose
         run: |
-          docker-compose -f docker-compose.dev.yml up -d
+          docker compose -f docker-compose.dev.yml up -d
           sleep 15
       
       - name: Wait for services
@@ -74,7 +74,7 @@ jobs:
       - name: Re-run Tests After Fix
         if: steps.tests.outcome == 'failure'
         run: |
-          docker-compose -f docker-compose.dev.yml restart
+          docker compose -f docker-compose.dev.yml restart
           sleep 10
           cd frontend && npx playwright test
       
@@ -141,4 +141,4 @@ jobs:
       
       - name: Cleanup
         if: always()
-        run: docker-compose -f docker-compose.dev.yml down -v
+        run: docker compose -f docker-compose.dev.yml down -v

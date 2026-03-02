@@ -1,230 +1,201 @@
-"""Irrigation scheduler service.
+"""Irrigation Scheduler Service.
 
-Generates a 14-day irrigation schedule based on soil moisture depletion,
-crop water requirements, weather forecast, and respects rain probability thresholds.
+Generates 14-day irrigation schedules based on soil moisture, crop stage,
+weather forecasts, and water availability. Respects rain probability thresholds.
 """
 
 import logging
-from datetime import date, datetime, timedelta
+from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
 
 from .soil_moisture import SoilMoistureEstimator
-from .irrigation_cost import IrrigationCostEstimator
 
 logger = logging.getLogger(__name__)
 
-# If rain probability > this threshold, skip/postpone irrigation
-RAIN_SKIP_THRESHOLD = 0.70  # 70%
+# Skip irrigation if rain probability exceeds this threshold
+RAIN_SKIP_PROBABILITY = 0.70  # 70%
+RAIN_SKIP_MM = 10.0  # Skip if forecast rain > 10mm
 
-# Crop water requirements (mm per irrigation event) by stage
-CROP_WATER_REQUIREMENTS: Dict[str, Dict[str, float]] = {
-    "Rice": {"initial": 50, "mid": 65, "late": 40},
-    "Wheat": {"initial": 35, "mid": 50, "late": 30},
-    "Sugarcane": {"initial": 60, "mid": 80, "late": 55},
-    "Cotton": {"initial": 40, "mid": 60, "late": 35},
-    "Maize": {"initial": 35, "mid": 55, "late": 30},
-    "Tomato": {"initial": 30, "mid": 45, "late": 25},
-    "Groundnut": {"initial": 35, "mid": 50, "late": 30},
-    "Default": {"initial": 40, "mid": 55, "late": 35},
-}
-
-# Irrigation frequency (days between events) by crop stage
-IRRIGATION_FREQUENCY_DAYS: Dict[str, Dict[str, int]] = {
-    "Rice": {"initial": 3, "mid": 2, "late": 4},
-    "Wheat": {"initial": 8, "mid": 6, "late": 10},
-    "Sugarcane": {"initial": 5, "mid": 4, "late": 6},
-    "Cotton": {"initial": 7, "mid": 5, "late": 8},
-    "Maize": {"initial": 7, "mid": 5, "late": 8},
-    "Tomato": {"initial": 5, "mid": 4, "late": 6},
-    "Groundnut": {"initial": 7, "mid": 6, "late": 9},
-    "Default": {"initial": 7, "mid": 5, "late": 8},
+# Drought classification thresholds
+DROUGHT_THRESHOLDS = {
+    "none": 1.0,
+    "mild": 0.7,
+    "moderate": 0.4,
+    "severe": 0.2,
 }
 
 
 class IrrigationScheduler:
-    """Generate 14-day irrigation schedule with weather-aware adjustments."""
+    """Generate 14-day irrigation schedules for farm crops."""
 
-    def __init__(
-        self,
-        soil_moisture_estimator: Optional[SoilMoistureEstimator] = None,
-        cost_estimator: Optional[IrrigationCostEstimator] = None,
-    ):
+    def __init__(self, soil_moisture_estimator: Optional[SoilMoistureEstimator] = None):
         """Initialize scheduler with dependencies."""
         self.moisture_estimator = soil_moisture_estimator or SoilMoistureEstimator()
-        self.cost_estimator = cost_estimator or IrrigationCostEstimator()
 
     def generate_schedule(
         self,
         farm_data: Dict[str, Any],
+        crop_name: str,
+        crop_stage: str,
+        area_acres: float,
         weather_forecast: List[Dict[str, Any]],
-        area_acres: float = 1.0,
-        irrigation_method: str = "flood",
+        water_source: str = "canal",
         schedule_days: int = 14,
     ) -> Dict[str, Any]:
         """
-        Generate a 14-day irrigation schedule.
+        Generate an irrigation schedule.
 
         Args:
-            farm_data: Farm data with soil, crop, climate info
-            weather_forecast: List of daily weather forecasts (14 days)
-            area_acres: Farm area in acres
-            irrigation_method: Irrigation method (drip/sprinkler/flood)
+            farm_data: Farm snapshot with soil and location data
+            crop_name: Name of the crop
+            crop_stage: Current growth stage
+            area_acres: Area to irrigate in acres
+            weather_forecast: List of daily forecasts with temp, rain, humidity
+            water_source: irrigation source (canal, borewell, rainwater)
             schedule_days: Number of days to schedule (default 14)
 
         Returns:
-            14-day irrigation schedule with events and reasoning
+            Dict with schedule (list of events), summary, and recommendations
         """
         try:
-            soil_type = farm_data.get("soil_type", "Loam")
-            crop_name = farm_data.get("crop_name", "Default")
-            crop_stage = farm_data.get("crop_stage", "mid")
-            rainfall_7day = farm_data.get("rainfall_7day_mm", 20.0)
-            rainfall_30day = farm_data.get("rainfall_30day_mm", 60.0)
-            temp_avg = farm_data.get("temperature_avg_c", 28.0)
+            soil = farm_data.get("soil_profile", {})
+            soil_type = soil.get("texture", "Loam")
 
-            # Get initial soil moisture
-            moisture = self.moisture_estimator.estimate(
+            # Extract current weather conditions
+            current_weather = weather_forecast[0] if weather_forecast else {}
+            temperature = current_weather.get("temperature_c", 30.0)
+            humidity = current_weather.get("humidity_pct", 65.0)
+
+            # Get current soil moisture
+            moisture_data = self.moisture_estimator.estimate(
                 soil_type=soil_type,
-                rainfall_7day_mm=rainfall_7day,
-                rainfall_30day_mm=rainfall_30day,
-                temperature_avg_c=temp_avg,
                 crop_name=crop_name,
-                crop_growth_stage=crop_stage,
+                crop_stage=crop_stage,
+                days_since_rain=current_weather.get("days_since_rain", 3),
+                last_rain_mm=current_weather.get("last_rain_mm", 10.0),
+                temperature_c=temperature,
+                humidity_pct=humidity,
             )
 
-            crop_key = crop_name if crop_name in CROP_WATER_REQUIREMENTS else "Default"
-            water_per_event = CROP_WATER_REQUIREMENTS[crop_key].get(crop_stage, 50)
-            freq_days = IRRIGATION_FREQUENCY_DAYS[crop_key].get(crop_stage, 5)
+            # Generate day-by-day schedule
+            schedule_events = []
+            cumulative_moisture = moisture_data.get("available_water_fraction", 0.5)
+            etc_per_day = moisture_data.get("etc_per_day_mm", 5.0)
+            irrigation_volume_per_acre = self._calculate_irrigation_volume(
+                soil_type, crop_name, crop_stage, area_acres
+            )
 
-            today = date.today()
-            events: List[Dict[str, Any]] = []
-            total_water_mm = 0.0
-            total_cost_inr = 0.0
+            today = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
 
-            # Generate schedule based on frequency and weather
-            current_depletion_pct = moisture.get("depletion_pct", 40.0)
-
-            # Index weather by day offset
-            weather_by_day: Dict[int, Dict[str, Any]] = {}
-            for i, w in enumerate(weather_forecast[:schedule_days]):
-                weather_by_day[i] = w
-
-            days_since_last_irrigation = 0
             for day_offset in range(schedule_days):
-                event_date = today + timedelta(days=day_offset)
-                weather = weather_by_day.get(day_offset, {})
-                rain_prob = weather.get("rain_probability", 0.2)
-                expected_rain_mm = weather.get("expected_rainfall_mm", 0.0)
+                date = today + timedelta(days=day_offset)
+                forecast = weather_forecast[day_offset] if day_offset < len(weather_forecast) else {}
 
-                # Update depletion: increases by daily ET, decreases with rain
-                daily_et = max(0, 0.0023 * (temp_avg + 17.8) * 5.0)
-                kc = {"initial": 0.4, "mid": 1.1, "late": 0.65}.get(crop_stage, 1.0)
-                daily_etc = daily_et * kc
+                rain_prob = forecast.get("rain_probability", 0.2)
+                forecast_rain_mm = forecast.get("rain_mm", 0.0)
+                forecast_temp = forecast.get("temperature_c", temperature)
 
-                # Rain reduces depletion
-                rain_input = expected_rain_mm if rain_prob >= 0.5 else 0
-                current_depletion_pct += (daily_etc / 50) * 10  # simplified: 1mm ET = 0.2% depletion
-                current_depletion_pct -= (rain_input / 50) * 10
-                current_depletion_pct = max(0, min(100, current_depletion_pct))
+                # Determine if irrigation should be skipped due to rain
+                skip_rain = rain_prob >= RAIN_SKIP_PROBABILITY or forecast_rain_mm >= RAIN_SKIP_MM
 
-                days_since_last_irrigation += 1
+                # Apply daily ET depletion
+                daily_depletion = (etc_per_day * 0.01) * (forecast_temp / 30.0)
+                cumulative_moisture -= daily_depletion
 
-                # Decide whether to irrigate
-                should_irrigate = (
-                    days_since_last_irrigation >= freq_days
-                    and current_depletion_pct >= 30
-                )
-                skip_reason = None
+                # Replenish from rain
+                if forecast_rain_mm > 0:
+                    cumulative_moisture += forecast_rain_mm * 0.005  # convert mm to fraction
 
-                if should_irrigate:
-                    if rain_prob >= RAIN_SKIP_THRESHOLD:
-                        skip_reason = f"Heavy rain forecast ({int(rain_prob * 100)}% probability, {expected_rain_mm:.0f}mm expected) — irrigation postponed"
-                        should_irrigate = False
-                    elif day_offset == 0 and moisture.get("urgency") == "immediate":
-                        should_irrigate = True  # Override for critical urgency
+                cumulative_moisture = max(0.05, min(1.0, cumulative_moisture))
 
-                if should_irrigate:
-                    # Calculate water needed and cost
-                    actual_water = min(water_per_event, current_depletion_pct / 100 * 60)
-                    actual_water = max(20, actual_water)
+                # Determine if irrigation needed
+                needs_irrigation = cumulative_moisture < 0.45 and not skip_rain
 
-                    cost = self.cost_estimator.estimate(
-                        water_volume_mm=actual_water,
-                        area_acres=area_acres,
-                        irrigation_method=irrigation_method,
-                    )
+                event = {
+                    "date": date.isoformat(),
+                    "day_of_week": date.strftime("%A"),
+                    "day_offset": day_offset,
+                    "irrigate": needs_irrigation,
+                    "skip_reason": "forecast_rain" if skip_rain and cumulative_moisture < 0.45 else None,
+                    "rain_probability_pct": round(rain_prob * 100),
+                    "forecast_rain_mm": round(forecast_rain_mm, 1),
+                    "soil_moisture_pct": round(cumulative_moisture * 100, 1),
+                    "volume_liters": round(irrigation_volume_per_acre * area_acres) if needs_irrigation else 0,
+                    "duration_minutes": round(
+                        self._volume_to_duration(irrigation_volume_per_acre * area_acres, water_source)
+                    ) if needs_irrigation else 0,
+                    "recommended_time": "06:00" if needs_irrigation else None,
+                    "priority": self._determine_priority(cumulative_moisture, day_offset),
+                }
 
-                    event = {
-                        "date": event_date.isoformat(),
-                        "day_offset": day_offset,
-                        "action": "irrigate",
-                        "water_volume_mm": round(actual_water, 1),
-                        "water_volume_liters": cost.get("water_volume_liters", 0),
-                        "duration_hours": cost.get("pumping_hours", 2),
-                        "cost_inr": cost.get("total_cost_inr", 0),
-                        "soil_depletion_pct": round(current_depletion_pct, 1),
-                        "rain_probability": round(rain_prob, 2),
-                        "weather_note": weather.get("description", ""),
-                        "reason": f"Soil depletion {current_depletion_pct:.0f}% — {crop_name} needs water",
-                    }
-                    events.append(event)
-                    total_water_mm += actual_water
-                    total_cost_inr += cost.get("total_cost_inr", 0)
-                    current_depletion_pct = max(0, current_depletion_pct - actual_water / 50 * 15)
-                    days_since_last_irrigation = 0
+                schedule_events.append(event)
 
-                elif skip_reason or (rain_prob >= RAIN_SKIP_THRESHOLD and days_since_last_irrigation >= freq_days):
-                    if days_since_last_irrigation >= freq_days and rain_prob >= RAIN_SKIP_THRESHOLD:
-                        event = {
-                            "date": event_date.isoformat(),
-                            "day_offset": day_offset,
-                            "action": "skip",
-                            "water_volume_mm": 0,
-                            "cost_inr": 0,
-                            "rain_probability": round(rain_prob, 2),
-                            "expected_rainfall_mm": round(expected_rain_mm, 1),
-                            "reason": skip_reason or f"Rain forecast ({int(rain_prob * 100)}%) replaces irrigation",
-                        }
-                        events.append(event)
+                # Replenish moisture after irrigation
+                if needs_irrigation:
+                    cumulative_moisture = min(1.0, cumulative_moisture + 0.35)
 
-            # Next critical action
-            next_irrigation = next(
-                (e for e in events if e["action"] == "irrigate"), None
-            )
-
-            summary = {
-                "total_irrigation_events": sum(1 for e in events if e["action"] == "irrigate"),
-                "total_skipped_events": sum(1 for e in events if e["action"] == "skip"),
-                "total_water_mm": round(total_water_mm, 1),
-                "total_cost_inr": round(total_cost_inr, 2),
-                "cost_per_acre_inr": round(total_cost_inr / area_acres if area_acres > 0 else 0, 2),
-                "next_irrigation_date": next_irrigation["date"] if next_irrigation else None,
-                "current_soil_status": moisture.get("status", "unknown"),
-            }
+            # Build summary
+            irrigation_days = [e for e in schedule_events if e["irrigate"]]
+            skipped_days = [e for e in schedule_events if e["skip_reason"]]
 
             return {
-                "success": True,
-                "schedule_days": schedule_days,
-                "from_date": today.isoformat(),
-                "to_date": (today + timedelta(days=schedule_days - 1)).isoformat(),
-                "farm_data": {
-                    "soil_type": soil_type,
-                    "crop_name": crop_name,
-                    "crop_stage": crop_stage,
-                    "area_acres": area_acres,
-                    "irrigation_method": irrigation_method,
+                "crop": crop_name,
+                "crop_stage": crop_stage,
+                "area_acres": area_acres,
+                "water_source": water_source,
+                "schedule": schedule_events,
+                "summary": {
+                    "total_irrigation_events": len(irrigation_days),
+                    "total_skipped_rain": len(skipped_days),
+                    "next_irrigation_date": irrigation_days[0]["date"] if irrigation_days else None,
+                    "total_water_liters": sum(e["volume_liters"] for e in irrigation_days),
+                    "avg_interval_days": schedule_days / max(1, len(irrigation_days)),
                 },
-                "current_soil_moisture": moisture,
-                "events": events,
-                "summary": summary,
-                "generated_at": datetime.utcnow().isoformat(),
+                "current_soil_moisture": moisture_data,
+                "generated_at": datetime.now().isoformat(),
             }
 
-        except Exception as exc:
-            logger.error(f"Irrigation schedule generation failed: {exc}")
-            return {
-                "success": False,
-                "error": str(exc),
-                "events": [],
-                "summary": {},
-            }
+        except Exception as e:
+            logger.error("Irrigation schedule generation error: %s", e)
+            raise
+
+    def _calculate_irrigation_volume(
+        self, soil_type: str, crop_name: str, crop_stage: str, area_acres: float
+    ) -> float:
+        """Calculate irrigation volume in liters per acre."""
+        # Base application depth (mm) by crop/stage
+        base_depth_mm = {
+            "Rice": {"initial": 50, "development": 75, "mid": 100, "late": 50},
+            "Wheat": {"initial": 40, "development": 60, "mid": 80, "late": 40},
+            "Cotton": {"initial": 50, "development": 70, "mid": 90, "late": 60},
+            "Default": {"initial": 40, "development": 60, "mid": 75, "late": 40},
+        }
+
+        crop_depths = base_depth_mm.get(crop_name, base_depth_mm["Default"])
+        depth_mm = crop_depths.get(crop_stage.lower(), crop_depths["mid"])
+
+        # 1 mm depth over 1 acre = 4046.86 liters
+        return depth_mm * 4046.86 / 1000  # Convert to kL then back to L: depth_mm * 4.047
+
+    def _volume_to_duration(self, volume_liters: float, water_source: str) -> float:
+        """Estimate irrigation duration in minutes based on source flow rate."""
+        flow_rates = {
+            "drip": 200,    # liters/hour per acre
+            "sprinkler": 800,
+            "canal": 3000,
+            "borewell": 12000,
+            "flood": 5000,
+        }
+        flow_rate = flow_rates.get(water_source.lower(), 2000)
+        return volume_liters / flow_rate * 60  # minutes
+
+    def _determine_priority(self, moisture_fraction: float, day_offset: int) -> str:
+        """Determine irrigation priority based on moisture and urgency."""
+        if moisture_fraction < 0.20 or (moisture_fraction < 0.30 and day_offset == 0):
+            return "urgent"
+        elif moisture_fraction < 0.40:
+            return "high"
+        elif moisture_fraction < 0.55:
+            return "normal"
+        else:
+            return "optional"
