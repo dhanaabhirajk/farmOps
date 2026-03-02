@@ -221,7 +221,7 @@ export default function SketchPage() {
                   type="text"
                   value={farmName}
                   onChange={(e) => setFarmName(e.target.value)}
-                  placeholder={`My Farm ${new Date().toLocaleDateString("en-IN")}`}
+                  placeholder="My Farm"
                   className="w-full px-4 py-3 bg-gray-50 rounded-xl border-transparent focus:bg-white focus:ring-2 focus:ring-farm-green/20 outline-none text-sm transition-all"
                 />
               </div>

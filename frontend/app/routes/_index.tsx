@@ -113,13 +113,16 @@ export default function Home() {
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    <button
-                      onClick={(e) => removeFarm(f.id, e)}
-                      className="p-1.5 rounded-lg text-gray-300 hover:text-red-400 hover:bg-red-50 transition-all opacity-0 group-hover:opacity-100"
+                    <div
+                      role="button"
+                      tabIndex={0}
+                      onClick={(e) => { e.stopPropagation(); useFarmStore.getState().removeFarm?.(f.id); }}
+                      onKeyDown={(e) => { if (e.key === 'Enter') { e.stopPropagation(); useFarmStore.getState().removeFarm?.(f.id); } }}
+                      className="p-1.5 rounded-lg text-gray-300 hover:text-red-400 hover:bg-red-50 transition-all opacity-0 group-hover:opacity-100 cursor-pointer"
                       title="Remove farm"
                     >
                       <Trash2 className="w-4 h-4" />
-                    </button>
+                    </div>
                     <ChevronRight className="w-5 h-5 text-gray-300 group-hover:text-farm-green transition-colors" />
                   </div>
                 </motion.button>

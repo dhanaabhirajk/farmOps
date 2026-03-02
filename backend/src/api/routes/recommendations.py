@@ -12,7 +12,11 @@ from ...models.recommendation import Recommendation
 from ...services.recommendations.crop_recommender import CropRecommender
 from ...services.recommendations.recommendation_cache import RecommendationCache
 from ...services.recommendations.recommendation_repository import RecommendationRepository
+from ...services.recommendations.llm_insight_generator import LLMInsightGenerator
 from ...services.snapshot.snapshot_generator import SnapshotGenerator
+from ...services.location.soil_service import SoilService
+from ...services.location.location_service import LocationService
+from ...services.weather.weather_service import WeatherService
 
 logger = logging.getLogger(__name__)
 
@@ -22,7 +26,11 @@ router = APIRouter(prefix="", tags=["recommendations"])
 crop_recommender = CropRecommender()
 recommendation_cache = RecommendationCache()
 recommendation_repo = RecommendationRepository()
+llm_insight_generator = LLMInsightGenerator()
 snapshot_generator = SnapshotGenerator()
+_soil_svc = SoilService()
+_location_svc = LocationService()
+_weather_svc = WeatherService()
 
 
 class RecommendationRequest(BaseModel):
@@ -31,6 +39,12 @@ class RecommendationRequest(BaseModel):
     farm_id: UUID = Field(..., description="Farm UUID")
     season: str = Field(..., description="Target season (Kharif, Rabi, Summer, Samba, Kar, etc.)")
     use_cache: bool = Field(default=True, description="Whether to use cached recommendations")
+    # Optional farm location/profile — passed from frontend URL search-params
+    lat: Optional[float] = Field(None, description="Farm centroid latitude")
+    lon: Optional[float] = Field(None, description="Farm centroid longitude")
+    district: Optional[str] = Field(None, description="District name")
+    main_crop: Optional[str] = Field(None, description="Primary crop")
+    area_acres: Optional[float] = Field(None, description="Farm area in acres")
 
 
 class RecommendationResponse(BaseModel):
@@ -76,31 +90,49 @@ async def generate_crop_recommendations(request: RecommendationRequest):
                     }
                 )
         
-        # Get farm snapshot data (needed for recommendations)
-        # Mock farm data for MVP - in production, fetch from snapshot_generator
+        # Build farm_data from real services when coordinates are available,
+        # otherwise degrade gracefully to regional defaults.
+        district = request.district or "Tamil Nadu"
+
+        if request.lat and request.lon:
+            soil = _soil_svc.get_soil_profile_by_coords(request.lat, request.lon) or {}
+            location_profile = _location_svc.get_location_profile(request.lat, request.lon)
+            weather_snap = _weather_svc.get_weather_snapshot(request.lat, request.lon)
+        else:
+            soil = {}
+            location_profile = {}
+            weather_snap = {}
+
+        current_weather = weather_snap.get("current") or {}
+        forecast_days = weather_snap.get("forecast_7_days") or weather_snap.get("forecast") or []
+        rainfall_7day = sum(d.get("rainfall_mm", 0) for d in forecast_days[:7]) if forecast_days else None
+
         farm_data = {
             "location_profile": {
-                "climate_zone": "tropical",
-                "temperature_annual_avg_c": 27.5,
-                "rainfall_annual_avg_mm": 950,
-                "district": "Thanjavur",
+                "climate_zone": location_profile.get("climate_zone", "tropical"),
+                "temperature_annual_avg_c": location_profile.get("temperature_c_annual_avg", 27.5),
+                "rainfall_annual_avg_mm": location_profile.get("rainfall_mm_annual", 950),
+                "district": district,
+                "lat": request.lat,
+                "lon": request.lon,
             },
             "soil_profile": {
-                "soil_type": "Clay-Loam",
-                "ph": 6.8,
-                "organic_carbon_pct": 0.65,
-                "nitrogen_kg_ha": 280,
-                "phosphorus_kg_ha": 15,
-                "potassium_kg_ha": 290,
-                "drainage": "moderate",
+                "soil_type": soil.get("soil_type", "Clay-Loam"),
+                "ph": soil.get("pH", 6.8),
+                "organic_carbon_pct": soil.get("organic_carbon_pct", 0.65),
+                "nitrogen_kg_ha": soil.get("nitrogen_mg_kg", 280),
+                "phosphorus_kg_ha": soil.get("phosphorus_mg_kg", 15),
+                "potassium_kg_ha": soil.get("potassium_mg_kg", 290),
+                "drainage": soil.get("drainage_class", "moderate"),
             },
             "weather": {
-                "current_temp_c": 28,
-                "rainfall_7day_mm": 45,
+                "current_temp_c": current_weather.get("temperature_c"),
+                "rainfall_7day_mm": rainfall_7day,
+                "source": weather_snap.get("source"),
             },
-            "market": {
-                "trend": "stable",
-            },
+            "market": {"trend": "stable"},
+            "main_crop": request.main_crop,
+            "area_acres": request.area_acres,
         }
         
         # Generate recommendations
@@ -116,9 +148,26 @@ async def generate_crop_recommendations(request: RecommendationRequest):
                 status_code=500,
                 detail=f"Failed to generate recommendations: {result.get('error')}"
             )
-        
+
+        # Enrich with LLM-generated insights (gracefully skipped if no API key)
+        try:
+            enriched = await llm_insight_generator.enrich_recommendations(
+                recommendations=result.get("recommended_crops", []),
+                season=request.season,
+                farm_data=farm_data,
+            )
+            result["recommended_crops"] = enriched["recommendations"]
+            result["ai_summary"] = enriched["ai_summary"]
+            result["model_version"] = "mistral-large-latest"
+        except Exception as llm_err:
+            logger.warning(f"LLM enrichment skipped: {llm_err}")
+            result.setdefault("ai_summary", None)
+
         # Persist to Supabase
-        confidence_pct = int(result.get("confidence", 0.0) * 100)
+        # confidence from recommender is already 0-100 scale
+        raw_conf = result.get("confidence", 0.0)
+        confidence_pct = int(raw_conf) if raw_conf > 1 else int(raw_conf * 100)
+        confidence_pct = max(0, min(100, confidence_pct))
         sources = [
             {"source_name": tc.get("tool", "unknown"), "data_age_hours": 0, "confidence_contribution_pct": 0}
             for tc in result.get("tool_calls", [])
@@ -126,14 +175,20 @@ async def generate_crop_recommendations(request: RecommendationRequest):
         if not sources:
             sources = [{"source_name": "crop_knowledge", "data_age_hours": 0, "confidence_contribution_pct": 100}]
 
+        ai_summary_obj = result.get("ai_summary") or {}
+        persisted_explanation = (
+            ai_summary_obj.get("summary")
+            or result.get("explanation", "")
+        )[:2000]
+
         saved = recommendation_repo.save(
             farm_id=request.farm_id,
             rec_type="crop",
             payload=result,
             confidence=confidence_pct,
             sources=sources,
-            explanation=result.get("explanation", "")[:2000],
-            model_version="crop-recommender-v1",
+            explanation=persisted_explanation,
+            model_version=result.get("model_version", "crop-recommender-v1"),
             tool_calls=result.get("tool_calls", []),
             ttl_hours=48,
         )

@@ -8,13 +8,22 @@ from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 from uuid import UUID
 
-from ...db.supabase_client import get_supabase_service
+from ...db.supabase_client import get_supabase, get_supabase_service
 
 logger = logging.getLogger(__name__)
 
 # How long a crop recommendation stays active before expiry
 _CROP_TTL_HOURS = 48
 _REVIEW_CONFIDENCE_THRESHOLD = 40  # Below this → human_review_required = True
+
+
+def _client():
+    """Return service client when available, anon client otherwise."""
+    try:
+        return get_supabase_service()
+    except ValueError:
+        logger.debug("Service role key not set; using anon Supabase client")
+        return get_supabase()
 
 
 class RecommendationRepository:
@@ -43,7 +52,7 @@ class RecommendationRepository:
         Returns the inserted row or None on error.
         """
         try:
-            client = get_supabase_service()
+            client = _client()
 
             # Mark existing active recommendations as superseded
             client.table("recommendations").update({"status": "superseded"}).eq(
@@ -108,7 +117,7 @@ class RecommendationRepository:
             List of recommendation rows ordered by created_at DESC.
         """
         try:
-            client = get_supabase_service()
+            client = _client()
 
             query = (
                 client.table("recommendations")
@@ -165,7 +174,7 @@ class RecommendationRepository:
             List of rows.
         """
         try:
-            client = get_supabase_service()
+            client = _client()
 
             query = (
                 client.table("recommendations")
@@ -198,7 +207,7 @@ class RecommendationRepository:
     def archive(self, recommendation_id: UUID) -> bool:
         """Set a recommendation status to 'archived'."""
         try:
-            client = get_supabase_service()
+            client = _client()
             client.table("recommendations").update({"status": "archived"}).eq(
                 "id", str(recommendation_id)
             ).execute()

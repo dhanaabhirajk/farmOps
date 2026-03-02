@@ -190,10 +190,11 @@ class SnapshotGenerator:
     async def _get_soil_summary_async(
         self, farm_id: UUID, latitude: float, longitude: float
     ) -> dict[str, Any]:
-        """Get soil profile summary (cached/static data)."""
+        """Get soil profile summary via SoilGrids API using farm coordinates."""
         if self.soil_service:
             try:
-                profile = self.soil_service.get_soil_profile(farm_id)
+                # Use real SoilGrids API with actual farm coordinates
+                profile = self.soil_service.get_soil_profile_by_coords(latitude, longitude)
                 if profile:
                     return {
                         "type": profile.get("soil_type"),
@@ -201,8 +202,11 @@ class SnapshotGenerator:
                         "organic_carbon_pct": profile.get("organic_carbon_pct"),
                         "drainage": profile.get("drainage_class"),
                         "status": profile.get("status"),
-                        "confidence": profile.get("confidence", 0.7),
-                        "data_age_hours": 1440,
+                        "confidence": profile.get("confidence", 0.78),
+                        "data_source": profile.get("data_source", "SoilGrids (ISRIC)"),
+                        "clay_pct": profile.get("clay_pct"),
+                        "sand_pct": profile.get("sand_pct"),
+                        "data_age_hours": 0,
                     }
             except Exception as e:
                 logger.warning(f"Soil service error: {e}")

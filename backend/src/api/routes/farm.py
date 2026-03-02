@@ -76,7 +76,7 @@ async def get_farm_snapshot(
         # Resolve coordinates with defaults
         _lat = lat if lat is not None else 10.7870
         _lon = lon if lon is not None else 79.1378
-        _district = district or "Thanjavur"
+        _district = district or "Tamil Nadu"
 
         # Compute a stable hash for this exact parameter combination
         p_hash = mem_cache.params_hash(
@@ -153,7 +153,8 @@ async def get_farm_snapshot(
         }
 
         # Generate snapshot using LLM agent
-        generator = SnapshotGenerator()
+        from ...services.location.soil_service import SoilService
+        generator = SnapshotGenerator(soil_service=SoilService())
         result = await generator.generate_farm_snapshot(
             farm_id=farm_uuid,
             farm_data=farm_data,

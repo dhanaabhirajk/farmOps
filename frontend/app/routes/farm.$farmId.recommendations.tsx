@@ -25,6 +25,16 @@ interface LoaderData {
   farmId: string;
   farmName: string;
   seasons: string[];
+  district: string | null;
+  lat: number | null;
+  lon: number | null;
+  mainCrop: string | null;
+  areaAcres: number | null;
+}
+
+interface AiSummary {
+  summary: string;
+  action_items: string[];
 }
 
 interface RecommendationResponse {
@@ -34,6 +44,7 @@ interface RecommendationResponse {
     season: string;
     confidence: number;
     explanation: string;
+    ai_summary?: AiSummary;
     tool_calls: Array<any>;
   };
   error?: string;
@@ -47,12 +58,17 @@ interface RecommendationResponse {
 export async function loader({ params, request }: LoaderFunctionArgs) {
   const farmId = params.farmId || "00000000-0000-0000-0000-000000000000";
   const url = new URL(request.url);
-  const farmName = url.searchParams.get("farm_name") ?? "Farm";
+  const farmName  = url.searchParams.get("farm_name") ?? "Farm";
+  const district  = url.searchParams.get("district")  ?? null;
+  const lat       = parseFloat(url.searchParams.get("lat") ?? "") || null;
+  const lon       = parseFloat(url.searchParams.get("lon") ?? "") || null;
+  const mainCrop  = url.searchParams.get("main_crop")  ?? null;
+  const areaAcres = parseFloat(url.searchParams.get("area_acres") ?? "") || null;
 
   // Available seasons for Tamil Nadu
   const seasons = ["Kharif", "Rabi", "Summer", "Kar", "Samba", "Thaladi"];
 
-  return json<LoaderData>({ farmId, farmName, seasons });
+  return json({ farmId, farmName, seasons, district, lat, lon, mainCrop, areaAcres });
 }
 
 export async function action({ request, params }: ActionFunctionArgs) {
@@ -62,7 +78,12 @@ export async function action({ request, params }: ActionFunctionArgs) {
 
   const farmId = params.farmId;
   const formData = await request.formData();
-  const season = formData.get("season") as string;
+  const season    = formData.get("season")     as string;
+  const district  = formData.get("district")   as string | null;
+  const lat       = parseFloat(formData.get("lat")        as string) || null;
+  const lon       = parseFloat(formData.get("lon")        as string) || null;
+  const mainCrop  = formData.get("main_crop")  as string | null;
+  const areaAcres = parseFloat(formData.get("area_acres") as string) || null;
 
   try {
     // Call backend API (using relative path - will be proxied by Remix)
@@ -73,9 +94,14 @@ export async function action({ request, params }: ActionFunctionArgs) {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        farm_id: farmId,
-        season: season,
-        use_cache: true,
+        farm_id:    farmId,
+        season,
+        use_cache:  true,
+        ...(district  && { district }),
+        ...(lat       && { lat }),
+        ...(lon       && { lon }),
+        ...(mainCrop  && { main_crop: mainCrop }),
+        ...(areaAcres && { area_acres: areaAcres }),
       }),
     });
 
@@ -96,12 +122,13 @@ export async function action({ request, params }: ActionFunctionArgs) {
 }
 
 export default function FarmRecommendations() {
-  const { farmId, farmName, seasons } = useLoaderData<typeof loader>();
+  const { farmId, farmName, seasons, district, lat, lon, mainCrop, areaAcres } = useLoaderData<typeof loader>();
   const [searchParams] = useSearchParams();
   const fetcher = useFetcher<RecommendationResponse>();
   const [selectedSeason, setSelectedSeason] = useState<string>("Samba");
   const [recommendations, setRecommendations] = useState<CropRecommendation[] | null>(null);
   const [confidence, setConfidence] = useState<number>(0);
+  const [aiSummary, setAiSummary] = useState<AiSummary | null>(null);
 
   // Handle fetcher state changes
   useEffect(() => {
@@ -109,6 +136,7 @@ export default function FarmRecommendations() {
       if (fetcher.data.success && fetcher.data.data) {
         setRecommendations(fetcher.data.data.recommended_crops || []);
         setConfidence(fetcher.data.data.confidence || 0);
+        setAiSummary(fetcher.data.data.ai_summary ?? null);
       }
     }
   }, [fetcher.data]);
@@ -167,44 +195,62 @@ export default function FarmRecommendations() {
         </div>
 
         {/* Season Selection */}
-        <Card className="p-6 mb-6">
-          <h2 className="text-xl font-semibold mb-4">Select Season</h2>
-          <fetcher.Form method="POST" className="space-y-4">
-            <div className="flex flex-wrap gap-3 mb-4">
+        <div className="mb-6 rounded-2xl border border-green-200 bg-gradient-to-br from-green-50 to-emerald-50 p-6 shadow-sm">
+          <div className="flex items-center gap-2 mb-5">
+            <span className="text-xl">🌾</span>
+            <h2 className="text-lg font-bold text-green-900">Select Season</h2>
+            {district && (
+              <span className="ml-auto text-xs text-green-700 bg-green-100 border border-green-200 px-2 py-0.5 rounded-full">
+                📍 {district}
+              </span>
+            )}
+          </div>
+          <fetcher.Form method="POST" className="space-y-5">
+            <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
               {seasons.map((season) => (
                 <button
                   key={season}
                   type="button"
                   onClick={() => setSelectedSeason(season)}
-                  className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                  className={`relative py-2.5 px-3 rounded-xl text-sm font-semibold transition-all duration-150 border ${
                     selectedSeason === season
-                      ? "bg-blue-600 text-white"
-                      : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+                      ? "bg-green-600 text-white border-green-700 shadow-md scale-105"
+                      : "bg-white text-green-800 border-green-200 hover:bg-green-100 hover:border-green-400"
                   }`}
                 >
                   {season}
+                  {selectedSeason === season && (
+                    <span className="absolute -top-1 -right-1 w-3 h-3 bg-amber-400 rounded-full border-2 border-white" />
+                  )}
                 </button>
               ))}
             </div>
 
-            <input type="hidden" name="season" value={selectedSeason} />
-            
+            <input type="hidden" name="season"     value={selectedSeason} />
+            {district  && <input type="hidden" name="district"   value={district} />}
+            {lat       && <input type="hidden" name="lat"        value={lat} />}
+            {lon       && <input type="hidden" name="lon"        value={lon} />}
+            {mainCrop  && <input type="hidden" name="main_crop"  value={mainCrop} />}
+            {areaAcres && <input type="hidden" name="area_acres" value={areaAcres} />}
+
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full md:w-auto px-6 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 disabled:bg-gray-400"
+              className="flex items-center gap-2 px-6 py-2.5 bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white rounded-xl font-semibold shadow-sm transition-colors"
             >
               {isLoading ? (
                 <>
-                  <Spinner size="sm" className="mr-2 inline-block" />
-                  Generating Recommendations...
+                  <Spinner size="sm" className="inline-block" />
+                  Generating Recommendations…
                 </>
               ) : (
-                "Get Recommendations"
+                <>
+                  <span>✨</span> Get Recommendations
+                </>
               )}
             </button>
           </fetcher.Form>
-        </Card>
+        </div>
 
         {/* Error Message */}
         {error && (
@@ -227,6 +273,30 @@ export default function FarmRecommendations() {
                 </span>
               </div>
             </div>
+
+            {/* AI Season Strategy Summary */}
+            {aiSummary && (
+              <div className="mb-6 p-5 bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-xl shadow-sm">
+                <div className="flex items-center gap-2 mb-3">
+                  <span className="text-2xl">🌾</span>
+                  <h3 className="font-bold text-green-900 text-lg">AI Season Strategy</h3>
+                  <span className="ml-auto text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-medium">
+                    Mistral AI
+                  </span>
+                </div>
+                <p className="text-sm text-gray-700 mb-3 leading-relaxed">{aiSummary.summary}</p>
+                {aiSummary.action_items && aiSummary.action_items.length > 0 && (
+                  <ul className="space-y-1">
+                    {aiSummary.action_items.map((item, i) => (
+                      <li key={i} className="text-xs text-gray-600 flex items-start gap-2">
+                        <span className="text-green-500 mt-0.5 shrink-0">→</span>
+                        <span>{item}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )}
 
             <div className="grid gap-6 md:grid-cols-1 lg:grid-cols-1">
               {recommendations.map((rec, index) => (

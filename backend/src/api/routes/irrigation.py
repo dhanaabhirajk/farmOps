@@ -15,10 +15,13 @@ from pydantic import BaseModel, Field
 from ...services.recommendations.soil_moisture import SoilMoistureEstimator
 from ...services.recommendations.irrigation_scheduler import IrrigationScheduler
 from ...services.recommendations.irrigation_cost import IrrigationCostEstimator
+from ...services.weather.weather_service import WeatherService
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/farm", tags=["irrigation"])
+
+_weather_svc = WeatherService()
 
 
 class IrrigationRequest(BaseModel):
@@ -33,6 +36,8 @@ class IrrigationRequest(BaseModel):
     power_source: str = Field("electricity", description="Power source: electricity, diesel, solar")
     soil_type: Optional[str] = Field(None, description="Soil type override (uses farm data if not provided)")
     schedule_days: int = Field(14, ge=1, le=30, description="Number of days to schedule")
+    lat: Optional[float] = Field(None, description="Farm centroid latitude (used for live weather fetch)")
+    lon: Optional[float] = Field(None, description="Farm centroid longitude (used for live weather fetch)")
 
 
 class IrrigationResponse(BaseModel):
@@ -44,25 +49,25 @@ class IrrigationResponse(BaseModel):
     metadata: Optional[Dict[str, Any]] = None
 
 
-def _mock_weather_forecast(days: int = 14) -> List[Dict[str, Any]]:
+def _fallback_weather_forecast(days: int = 14) -> List[Dict[str, Any]]:
     """
-    Generate mock weather forecast for testing/fallback.
-    In production, this would call the weather service.
+    Deterministic fallback weather forecast used when coordinates are unavailable
+    or the weather service is unreachable.
     """
-    import random
-    random.seed(42)  # Deterministic for testing
-
+    from math import sin, pi
     forecast = []
     for i in range(days):
-        is_rainy_day = random.random() < 0.25  # 25% chance of rain
+        # Simple sinusoidal temperature variation + every-4th-day light rain pattern
+        temp = 28.0 + 3.0 * sin(2 * pi * i / 7)
+        is_rainy = (i % 4 == 3)
         forecast.append({
             "date": (datetime.now() + timedelta(days=i)).strftime("%Y-%m-%d"),
-            "temperature_c": 28.0 + random.uniform(-4, 6),
-            "humidity_pct": 70.0 + random.uniform(-15, 20),
-            "rain_probability": random.uniform(0.5, 0.95) if is_rainy_day else random.uniform(0.0, 0.35),
-            "rain_mm": random.uniform(5.0, 40.0) if is_rainy_day else 0.0,
-            "days_since_rain": 0 if is_rainy_day else max(1, i),
-            "last_rain_mm": 20.0,
+            "temperature_c": round(temp, 1),
+            "humidity_pct": 72.0,
+            "rain_probability": 0.6 if is_rainy else 0.1,
+            "rain_mm": 12.0 if is_rainy else 0.0,
+            "days_since_rain": 0 if is_rainy else max(1, i % 4),
+            "last_rain_mm": 12.0,
         })
     return forecast
 
@@ -98,7 +103,7 @@ async def generate_irrigation_schedule(request: IrrigationRequest) -> Irrigation
                 detail=f"Invalid crop_stage '{request.crop_stage}'. Must be one of: {', '.join(valid_stages)}",
             )
 
-        # Mock farm data (in production, fetch from Supabase)
+        # Build farm_data from request fields
         farm_data: Dict[str, Any] = {
             "farm_id": request.farm_id,
             "soil_profile": {
@@ -107,13 +112,36 @@ async def generate_irrigation_schedule(request: IrrigationRequest) -> Irrigation
                 "organic_carbon_pct": 0.7,
             },
             "location_profile": {
-                "district": "Thanjavur",
                 "state": "Tamil Nadu",
             },
         }
 
-        # Get weather forecast (in production, call weather service)
-        weather_forecast = _mock_weather_forecast(request.schedule_days + 2)  # Extra days buffer
+        # Fetch real weather forecast; fall back to open-meteo defaults if coords unavailable
+        lat_val = getattr(request, "lat", None)
+        lon_val = getattr(request, "lon", None)
+        if lat_val and lon_val:
+            try:
+                snap = _weather_svc.get_weather_snapshot(lat_val, lon_val, days=request.schedule_days + 2)
+                forecast_raw = snap.get("forecast_7_days") or snap.get("forecast") or []
+                weather_forecast: List[Dict[str, Any]] = [
+                    {
+                        "date": d.get("date", (datetime.now() + timedelta(days=i)).strftime("%Y-%m-%d")),
+                        "temperature_c": d.get("temperature_c") or d.get("temp_max_c") or 28.0,
+                        "humidity_pct": d.get("humidity_pct", 70.0),
+                        "rain_probability": (d.get("rainfall_probability_pct") or d.get("rain_probability", 20)) / 100,
+                        "rain_mm": d.get("rainfall_mm", 0.0),
+                        "days_since_rain": 0 if (d.get("rainfall_mm") or 0) > 0 else max(1, i),
+                        "last_rain_mm": d.get("rainfall_mm", 0.0),
+                    }
+                    for i, d in enumerate(forecast_raw[:request.schedule_days + 2])
+                ]
+                if not weather_forecast:
+                    raise ValueError("empty forecast")
+            except Exception as wx_err:
+                logger.warning(f"Weather fetch failed, using fallback: {wx_err}")
+                weather_forecast = _fallback_weather_forecast(request.schedule_days + 2)
+        else:
+            weather_forecast = _fallback_weather_forecast(request.schedule_days + 2)
 
         # Generate irrigation schedule
         scheduler = IrrigationScheduler()

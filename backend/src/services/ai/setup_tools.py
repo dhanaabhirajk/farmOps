@@ -36,6 +36,12 @@ async def setup_all_tools() -> None:
         TOOL_PARAMETERS as FARM_IMAGE_PARAMS,
         handler as farm_image_handler,
     )
+    from ..ai_tools.search_government_schemes import (
+        TOOL_NAME as SCHEME_NAME,
+        TOOL_DESCRIPTION as SCHEME_DESC,
+        TOOL_PARAMETERS as SCHEME_PARAMS,
+        handler as scheme_handler,
+    )
 
     registry = get_tool_registry()
 
@@ -273,6 +279,17 @@ async def setup_all_tools() -> None:
         handler=_make_estimate_profit_handler(),
     )
 
+    # ─── US5: Subsidy & Scheme Match ─────────────────────────────────────────
+
+    # search_government_schemes: discover eligible Indian government agricultural schemes
+    registry.register(
+        name=SCHEME_NAME,
+        description=SCHEME_DESC,
+        parameters=SCHEME_PARAMS,
+        handler=scheme_handler,
+        requires_auth=False,
+    )
+
     count = len(registry.list_tools())
     logger.info(f"Tool setup complete. {count} tools registered: {registry.list_tools()}")
 
@@ -302,7 +319,7 @@ def _make_soil_profile_handler():
     async def handle(latitude: float, longitude: float, farm_id: str | None = None) -> dict:
         from ..location.soil_service import SoilService
         svc = SoilService()
-        result = svc.get_soil_profile(latitude, longitude)
+        result = svc.get_soil_profile_by_coords(latitude, longitude)
         return result if result else {"error": "Soil profile not found"}
     return handle
 

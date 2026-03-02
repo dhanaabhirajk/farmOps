@@ -10,13 +10,15 @@ logger = logging.getLogger(__name__)
 
 class GetSoilProfileInput(BaseModel):
     """Input schema for get_soil_profile tool."""
-    
+
     farm_id: str = Field(..., description="Farm UUID")
+    latitude: Optional[float] = Field(None, description="Farm centroid latitude")
+    longitude: Optional[float] = Field(None, description="Farm centroid longitude")
 
 
 class GetSoilProfileOutput(BaseModel):
     """Output schema for get_soil_profile tool."""
-    
+
     success: bool
     farm_id: str
     soil_type: Optional[str]
@@ -30,6 +32,7 @@ class GetSoilProfileOutput(BaseModel):
     status: str
     confidence: float
     test_date: Optional[str]
+    data_source: Optional[str] = None
 
 
 class GetSoilProfileTool:
@@ -50,13 +53,15 @@ class GetSoilProfileTool:
         """
         self.soil_service = soil_service
 
-    def execute(self, farm_id: str) -> Dict[str, Any]:
+    def execute(self, farm_id: str, latitude: Optional[float] = None, longitude: Optional[float] = None) -> Dict[str, Any]:
         """
-        Execute the tool - fetch soil profile.
-        
+        Execute the tool - fetch soil profile via SoilGrids API (coords) or fallback.
+
         Args:
             farm_id: Farm UUID as string
-            
+            latitude: Farm centroid latitude (preferred for live API call)
+            longitude: Farm centroid longitude (preferred for live API call)
+
         Returns:
             Soil profile data
         """
@@ -64,7 +69,11 @@ class GetSoilProfileTool:
             if not self.soil_service:
                 raise RuntimeError("Soil service not initialized")
 
-            profile = self.soil_service.get_soil_profile(UUID(farm_id))
+            # Prefer coordinate-based real API call over farm_id mock
+            if latitude is not None and longitude is not None:
+                profile = self.soil_service.get_soil_profile_by_coords(latitude, longitude)
+            else:
+                profile = self.soil_service.get_soil_profile(UUID(farm_id))
 
             if not profile:
                 return {
@@ -88,6 +97,7 @@ class GetSoilProfileTool:
                 "status": profile.get("status", "unknown"),
                 "confidence": profile.get("confidence", 0.0),
                 "test_date": profile.get("test_date"),
+                "data_source": profile.get("data_source"),
             }
 
         except Exception as e:

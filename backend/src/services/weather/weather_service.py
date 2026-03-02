@@ -1,32 +1,97 @@
-"""Weather service coordinator (IMD + OpenWeatherMap fallback)."""
+"""Weather service coordinator (Open-Meteo primary → IMD → OpenWeatherMap fallback)."""
 
 import logging
 from typing import Any, Dict, Optional
 
 from .imd_client import IMDClient
+from .open_meteo_client import OpenMeteoClient
 from .openweather_client import OpenWeatherMapClient
 
 logger = logging.getLogger(__name__)
 
 
 class WeatherService:
-    """Coordinator for weather data with IMD primary and OpenWeatherMap fallback."""
+    """Coordinator for weather data.
+
+    Priority:
+      1. Open-Meteo  (free, no key, ~99 % uptime, excellent for India)
+      2. IMD         (India-authoritative, requires API key)
+      3. OpenWeatherMap (global fallback, requires API key)
+    """
 
     def __init__(
         self,
         imd_client: Optional[IMDClient] = None,
         openweather_client: Optional[OpenWeatherMapClient] = None,
+        open_meteo_client: Optional[OpenMeteoClient] = None,
     ):
-        """
-        Initialize weather service.
-        
-        Args:
-            imd_client: IMD client instance
-            openweather_client: OpenWeatherMap client instance
-        """
         self.imd_client = imd_client or IMDClient()
         self.openweather_client = openweather_client or OpenWeatherMapClient()
-        logger.info("Weather service initialized with IMD primary and OpenWeatherMap fallback")
+        self.open_meteo_client = open_meteo_client or OpenMeteoClient()
+        logger.info("Weather service initialized (Open-Meteo primary, IMD/OWM fallback)")
+
+    # ------------------------------------------------------------------
+    # NEW – unified method called by the LLM tool handler
+    # ------------------------------------------------------------------
+
+    def get_weather_snapshot(
+        self,
+        latitude: float,
+        longitude: float,
+        days: int = 7,
+    ) -> Dict[str, Any]:
+        """
+        Return a complete weather snapshot (current + forecast).
+
+        Tries Open-Meteo first (free, no key), then falls back to
+        OpenWeatherMap.
+
+        Args:
+            latitude:  Farm latitude
+            longitude: Farm longitude
+            days:      Forecast days
+
+        Returns:
+            Weather snapshot dict (never None — returns error dict on failure)
+        """
+        # ── 1. Open-Meteo (free, best for India) ─────────────────────
+        try:
+            result = self.open_meteo_client.get_weather_snapshot(latitude, longitude, days)
+            if result:
+                logger.info("Weather snapshot: Open-Meteo succeeded")
+                return result
+        except Exception as exc:
+            logger.warning(f"Open-Meteo snapshot failed: {exc}")
+
+        # ── 2. OpenWeatherMap fallback ───────────────────────────────
+        try:
+            current = self.openweather_client.get_current_weather(latitude, longitude)
+            forecast = self.openweather_client.get_forecast(latitude, longitude, days)
+            if current or forecast:
+                return {
+                    "source": "OpenWeatherMap",
+                    "location": {"lat": latitude, "lon": longitude},
+                    "current": current or {},
+                    "forecast_7_days": (forecast or {}).get("forecast_7days", []),
+                    "forecast": (forecast or {}).get("forecast_7days", []),
+                    "rainfall_probability_24h": None,
+                    "confidence": 0.75,
+                    "last_updated": (forecast or {}).get("last_updated"),
+                    "fallback_used": True,
+                }
+        except Exception as exc:
+            logger.error(f"OpenWeatherMap snapshot also failed: {exc}")
+
+        # ── 3. Both unavailable ──────────────────────────────────────
+        return {
+            "source": "unavailable",
+            "location": {"lat": latitude, "lon": longitude},
+            "current": {},
+            "forecast_7_days": [],
+            "confidence": 0.0,
+            "error": "All weather sources unavailable",
+            "fallback_used": True,
+        }
 
     def get_forecast(
         self,
